@@ -1,8 +1,10 @@
-"""M8 agent 集成服务：生成 hook 配置与 skill 说明书文件（架构文档 §8、ADR-12）。
+"""M8 agent 集成服务：生成 skill 说明书与 README 文件（架构文档 §8、ADR-12）。
 
 仅生成文件、不执行任何外部命令；幂等（重复执行覆盖旧文件，不报错）。
 
-claude / opencode 产出 hook.md + skill.md + README.md（写入 agent 配置目录）；
+claude / opencode 产出 skill 说明书（写入官方 skills/mex/SKILL.md 发现路径）+ README.md
+（写入 agent 配置目录）。不再生成 hooks.md——OpenCode 原生不支持 SessionEnd hook
+（官方配置 schema 无 hooks 字段），写路径由 skill 引导 agent 即时写承担，hook 能力留待扩展；
 dsh 产出标准 DSH bundle 目录（index.js + package.json + cordis.patch.yml + README.md）。
 """
 
@@ -22,9 +24,15 @@ from mex.config import get_mex_home
 AgentName = Literal["claude", "opencode", "dsh"]
 Scope = Literal["project", "global"]
 
-FILE_NAMES = ("hooks.md", "skill.md", "README.md")
+# claude/opencode 的生成物布局：(模板文件名, 目标相对路径)。
+# skill 说明书写入官方 skills/<name>/SKILL.md（skills 为复数，Claude Code / OpenCode 的
+# 官方发现路径），README 写配置目录根。hooks.md 不再生成（见模块 docstring）。
+SKILL_FILE_LAYOUT = (
+    ("skill.md", "skills/mex/SKILL.md"),
+    ("README.md", "README.md"),
+)
 
-# DSH bundle 的组成文件（与 FILE_NAMES 不同的独立清单）。
+# DSH bundle 的组成文件（独立于 SKILL_FILE_LAYOUT 的清单）。
 DSH_BUNDLE_FILES = ("index.js", "package.json", "cordis.patch.yml", "README.md")
 
 
@@ -76,12 +84,23 @@ def integrate(agent: AgentName, scope: Scope) -> IntegrationResult:
 
 
 def _generate_skill_files(agent: AgentName, base_dir: Path) -> list[str]:
-    """渲染 claude/opencode 的 hook/skill/README 三件套写入 base_dir。"""
+    """渲染 claude/opencode 的 skill 说明书 + README 写入 base_dir。
+
+    skill.md 落到 ``base_dir/skills/mex/SKILL.md``（官方发现路径），README 落根目录。
+
+    Args:
+        agent: 目标 agent（claude / opencode）。
+        base_dir: agent 配置根目录。
+
+    Returns:
+        写入的文件绝对路径清单。
+    """
     mex_home = get_mex_home()
     written: list[str] = []
-    for name in FILE_NAMES:
-        target = base_dir / name
-        content = _render_template(agent, name, base_dir, mex_home)
+    for template_name, rel_path in SKILL_FILE_LAYOUT:
+        target = base_dir / rel_path
+        content = _render_template(agent, template_name, base_dir, mex_home)
+        target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content, encoding="utf-8")
         written.append(str(target))
         logger.info("已生成 {}：{}", agent, target)
@@ -134,7 +153,7 @@ def _render_template(agent: AgentName, name: str, base_dir: Path, mex_home: str)
 
     Args:
         agent: 目标 agent（决定模板子目录）。
-        name: 模板文件名（hooks.md / skill.md / README.md）。
+        name: 模板文件名（skill.md / README.md）。
         base_dir: 目标根目录（渲染进 {{AGENT_DIR}}）。
         mex_home: 数据目录（渲染进 {{MEX_HOME}} / {{DB_PATH}}）。
 

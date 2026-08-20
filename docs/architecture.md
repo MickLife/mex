@@ -3,7 +3,7 @@
 > 版本：v1.2（待用户审查）
 > 日期：2026-08-06
 > 依据：`docs/requirements.md`（最终需求）、三份竞品评估报告（已归档至 `docs/archive/research/`）
-> 状态说明：本文档记录顶层架构决策及其理由，作为后续开发的依据。ADR 部分（含 ADR-12）已与用户确认 ✅；§3.5-3.7、§4.3、§5.2、§6.4、§7、§9、§10 为补齐的 gap，待审查。
+> 状态说明：本文档记录顶层架构决策及其理由，作为后续开发的依据。ADR 部分已与用户确认 ✅（ADR-12 已于 2026-08-20 修订：skill 承载读写、会话结束 hook 留待扩展）；§3.5-3.7、§4.3、§5.2、§6.4、§7、§9、§10 为补齐的 gap，待审查。
 
 ## 1. 产品定位与设计目标
 
@@ -209,21 +209,21 @@ mex add --topic finance --content "今天基金跌了 3%，有点焦虑"
 
 **理由**：个人量级（年约千条）下 FTS5 检索无压力（保留原结论）；兼顾"隐私与数字遗忘"需求——用户能设定某些敏感对话到期自动销毁。`--expires` 只接受绝对日期/时间（本地转 UTC），不支持 `24h` 等相对时长（用户决定）。
 
-### ADR-12：extract 触发与 agent 集成 —— hook 兜底写、skill 管读与即时写 ✅
+### ADR-12：extract 触发与 agent 集成 —— skill 承载读写，hook 留待扩展 ✅（2026-08-20 修订）
 
-**决策**：hook 与 skill 都采用，读写分工：
+**决策**：以 skill 说明书承载 agent 侧的读写引导，`mex integrate <agent>` 生成 skill（写入官方 `skills/<name>/SKILL.md` 发现路径）+ README：
 
-- **写入主路径（hook 兜底）**：在 agent 软件（OpenCode / Claude Code）配置"会话结束"hook，自动执行 `mex extract --file <会话文件>`（后台异步）。hook 是 agent 软件的确定性事件规则，必然触发、不经过大模型判断，保证不漏记。
-- **写入即时路径（skill 引导）**：skill 说明书告诉 agent——当用户明确说"记住这个"时，立即执行 `mex extract "<用户原话>"` 将该内容传入，重要信息即时入库，不等会话结束。
-- **读取路径（skill 引导）**：skill 教 agent 在对话开始执行 `mex profile` 注入画像（自动模式）、需要细节时执行 `mex search`（手动模式）。
+- **写入即时路径（skill 引导）**：skill 告诉 agent——用户明确说"记住这个"时立即执行 `mex extract "<用户原话>"`；简单明确的单条事实也可用 `mex add`。重要信息即时入库，不等会话结束。
+- **读取路径（skill 引导）**：skill 教 agent 在对话开始执行 `mex profile` 注入画像（自动模式）、涉及生活/情绪/近期状态时执行 `mex search --since`（时敏召回）、需要细节时执行 `mex search --topic/--keyword`（手动模式）。
 - **手动命令是地基**：`mex extract --file <file>` / `mex extract "<文本>"` 随时可用。
-- **集成落地**：`mex integrate <agent> --scope project|global` 生成 hook 配置与 skill 文件，**由用户指定生成到项目级目录（仅该项目生效）还是全局目录（所有项目生效）**。
+- **集成落地**：`mex integrate <agent> --scope project|global` 生成 skill 说明书 + README，**由用户指定生成到项目级目录（仅该项目生效）还是全局目录（所有项目生效）**。
+- **会话结束 hook 暂缓**：早期方案以"hook 兜底写"为主路径，但 OpenCode 官方配置 schema 无 hooks 字段（原生不支持 Claude Code 风格的生命周期 hook），第一版**不生成 hook 配置**，写路径由 skill 引导即时写承担。hook 能力（第三方插件桥接 / 包装脚本聚合会话）留待后续扩展。
 
 **理由**：
 
-- hook 与 skill 不是二选一的竞争关系：hook 是确定性规则（必然触发但不理解内容），适合"写入兜底"；skill 是大模型自主判断（理解内容但可能漏），适合"读取调用"与"即时写入"这种需要理解对话语义的场景。两者组合互补短板。
+- skill 是 Claude Code / OpenCode 均支持的官方扩展点，承载读写引导无平台差异；hook 在 OpenCode 上无官方支持，作为主路径不成立。
+- skill 引导即时写依赖大模型自主判断（可能漏记），hook 兜底可弥补此短板——这正是 hook 留待后续扩展的动机（本 ADR 记录在案）。
 - "每轮对话后实时抽取"明确不做：LLM 延迟打断对话节奏，成本无谓放大。
-- hook 全量触发的 token 浪费可忽略：增量抽取（§8.3）保证重复触发只处理新增内容；纯 coding 会话返回空结果（§7.2 契约），一次调用约几分钱。
 - scope 参数的意义：用户可把工作项目（不需要记忆系统）与个性化对话场景分开——项目级配置只在该项目目录生效，全局配置对所有会话生效。
 
 ## 3. 数据模型
@@ -565,7 +565,7 @@ src/mex/
 | `mex import <file>` | 从导出文件恢复，或从 v1 markdown 抽取迁移 | `--mode restore\|extract` `--on-conflict skip\|overwrite` |
 | `mex config llm` | 交互式配置 LLM 供应商与模型（TTY 引导选择预设；非 TTY 需参数） | `--provider openai\|deepseek\|ollama\|moonshot\|qwen\|custom` `--base-url` `--api-key` `--model` |
 | `mex config show` | 查看当前 LLM 配置（key 打码） | `--json` |
-| `mex integrate <agent>` | 生成 agent 的 hook 配置与 skill 文件（ADR-12） | `--scope project\|global`（默认 global） |
+| `mex integrate <agent>` | 生成 agent 的 skill 说明书与 README（ADR-12） | `--scope project\|global`（默认 global） |
 | `mex stats` | 统计：画像内/画像外条目数、待审查数、库大小、LLM 累计用量 | |
 
 斜杠命令入口不属于 mex 本身：在 agent 侧配置 skill 文件调用 `mex profile` 即可。
@@ -742,15 +742,18 @@ system 消息按序拼接 8 部分，外加 user 消息（对话文本）。**�
 
 ## 8. Agent 集成
 
-meX 不修改 agent 软件本身，通过它们公开的 hook 机制与 skill 机制对接（ADR-12）。
+meX 不修改 agent 软件本身，通过 agent 软件公开的 skill 机制引导其读写记忆（ADR-12）；
+会话结束 hook（OpenCode 官方不支持）留待后续扩展。
 
 ### 8.1 触发时机总览
 
 | 时机 | 机制 | 说明 |
 |---|---|---|
-| 会话结束 | hook 自动触发 | agent 软件执行 `mex extract --file <会话文件> --from claude|opencode`，后台异步，不阻塞开新会话 |
-| 用户明确说"记住这个" | skill 引导 agent 即时执行 | `mex extract "<用户原话>"`，重要信息即时入库 |
+| 用户明确说"记住这个" | skill 引导 agent 即时执行 | `mex extract "<用户原话>"`（或 `mex add` 写单条事实），重要信息即时入库 |
+| 对话开始 | skill 引导 agent 加载背景 | `mex profile`，把画像注入上下文 |
+| 需要细节 / 近期状态 | skill 引导 agent 检索 | `mex search --topic`（定向）/ `mex search --since`（时敏召回） |
 | 任意时刻 | 手动 `mex extract --file <file>` 或 `mex extract "<文本>"` | 地基，永远可用 |
+| 会话结束自动抽取 | ❌ 暂缓（hook） | OpenCode 官方配置无 hooks 字段，第一版不生成 hook 配置，留待后续扩展（ADR-12） |
 | 每轮对话后 | ❌ 明确不做 | LLM 延迟打断对话节奏，成本无谓放大 |
 
 ### 8.2 会话解析适配器
@@ -767,7 +770,7 @@ meX 不修改 agent 软件本身，通过它们公开的 hook 机制与 skill �
 
 `extraction_state` 表（§3.1）记录每个会话文件"已处理到哪个位置"：
 
-- 对同一会话文件重复触发 extract 时（hook 多次触发、手动补抽），只处理 `last_position` 之后的新增内容——不重复抽取、不重复写入、不重复扣费。
+- 对同一会话文件重复触发 extract 时（重复触发、手动补抽），只处理 `last_position` 之后的新增内容——不重复抽取、不重复写入、不重复扣费。
 - 处理位置与记忆写入在同一事务中更新（§6.1 第 7 步），保证"处理成功才记录"。
 - 边界情况：若文件比上次记录的位置还短（被重建 / 截断），视为新文件从头处理。
 
@@ -782,20 +785,22 @@ mex integrate opencode --scope project  # 生成到 ./.opencode/
 
 - `--scope project`（项目级）：配置生成到当前项目目录，只对该目录下的 agent 会话生效。
 - `--scope global`（全局，**默认**）：生成到用户级配置目录，对所有项目的会话生效。
-- 生成内容：hook 配置（会话结束执行 extract）+ skill 说明书文件。
+- 生成内容：skill 说明书（写入官方 `skills/<name>/SKILL.md` 发现路径）+ README（对接步骤）。
+  不再生成 hook 配置——OpenCode 官方配置 schema 无 hooks 字段，会话结束自动抽取留待后续扩展（ADR-12）。
 - 执行后输出实际写入的文件路径清单，便于检查；重复执行覆盖旧文件（幂等）。
 
 典型用法：全局开启 = 所有会话都接入记忆系统；项目级 = 只给特定项目接入（如把纯工作代码项目排除在外）。
 
 ### 8.5 skill 说明书内容要点
 
-生成的 skill 文件教 agent 五件事：
+生成的 skill 文件教 agent 读写记忆（含写作原则）：
 
 1. **对话开始**：执行 `mex profile`，把输出作为用户背景注入上下文（自动模式）。
 2. **对话涉及用户生活、情绪或近期状态时**：先执行 `mex search --since 7d` 拉取近期记录（含画像外记录与画像槽位），感知用户最近发生了什么（时敏性召回；天数默认 7，可配置）。
 3. **需要细节时**：执行 `mex search --topic <领域> [--keyword ...]`（手动模式）。
-4. **用户明确说"记住这个"**：立即把用户原话经 `mex extract "<用户原话>"` 写入。
-5. **不要主动、频繁调用 extract**：写路径由会话结束 hook 兜底，避免重复花费。
+4. **用户明确说"记住这个"**：立即把用户原话经 `mex extract "<用户原话>"` 写入；简单明确的单条事实也可用 `mex add`。
+5. **不要主动、频繁调用写命令**：除非用户明确要求或说出"记住这个"，否则不主动调用 `mex extract` / `mex add`——写路径按需触发，避免重复花费 LLM 成本或写入噪音。
+6. **写作原则**：具体（保留名称/数字/日期/角色/原因）、独立（不读上下文可理解，禁止"本项目/它/那个"等指代）、有用、不重复；时间写具体日期（YYYY-MM-DD）；稳定事实写画像槽位（topic + sub_topic）、临时状态写画像外记录（省略 sub_topic）；人名/项目名用全称。
 
 ## 9. 本地存储布局
 
@@ -808,7 +813,7 @@ mex integrate opencode --scope project  # 生成到 ./.opencode/
 
 数据目录默认为 `~/.mex`，可用环境变量 `MEX_HOME` 覆盖（测试隔离、多实例场景使用）。
 
-**安装方式**：项目为可安装的 Python 包，`pip install -e .`（开发模式）或 `uv sync` 安装后 `mex` 命令进入 PATH。integrate 生成的 hook/skill 均依赖 PATH 中的 `mex`，故安装是集成的前置条件。
+**安装方式**：项目为可安装的 Python 包，`pip install -e .`（开发模式）或 `uv sync` 安装后 `mex` 命令进入 PATH。integrate 生成的 skill 依赖 PATH 中的 `mex`，故安装是集成的前置条件。
 
 **config.yaml 完整配置项**：
 

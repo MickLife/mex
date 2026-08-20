@@ -1,4 +1,4 @@
-"""``mex integrate`` 命令：生成 agent hook 配置与 skill 说明书（M8）。
+"""``mex integrate`` 命令：生成 agent 的 skill 说明书与 README（M8）。
 
 用法：
     mex integrate claude|opencode|dsh [--scope project|global] [--json]
@@ -18,14 +18,14 @@ _SUPPORTED_AGENTS = "claude, opencode, dsh"
 _SCOPES = ("project", "global")
 
 
-@app.command("integrate", help="Generate agent integration files (hook config + skill guide + README)")
+@app.command("integrate", help="Generate agent integration files (skill guide + README)")
 @run
 def integrate_cmd(
     agent: str = typer.Argument(..., help="Target agent: claude / opencode / dsh"),
     scope: str = typer.Option("global", "--scope", help="project (current dir) / global (user dir, default)"),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ) -> None:
-    """生成 agent 集成文件（hook 配置 + skill 说明书 + README）。"""
+    """生成 agent 集成文件（skill 说明书 + README）。"""
     if agent not in AGENT_TARGETS and agent != "dsh":
         raise UserError(f"Unknown agent '{agent}'. Supported agents: {_SUPPORTED_AGENTS}")
     if scope not in _SCOPES:
@@ -48,18 +48,16 @@ def _print_human(result: IntegrationResult) -> None:
 def _next_steps(agent: AgentName) -> str:
     """下一步说明：按 agent 类型给出不同的安装指引。"""
     if agent == "claude":
-        hook = "~/.claude/settings.json, project ./.claude/settings.json"
-        skill = "~/.claude/skills/mex/SKILL.md, project ./.claude/skills/mex/SKILL.md"
+        skill = "~/.claude/skills/mex/SKILL.md (global), ./.claude/skills/mex/SKILL.md (project)"
         return (
-            f"Next steps: paste the config in hooks.md into the \"hooks\" field of {agent}'s config "
-            f"({hook} for global); put the content of skill.md into the skill file ({skill} for global)."
+            f"Next steps: the skill is ready at {skill}. "
+            "Start a new session for it to take effect, then ask the agent to run `mex profile` to verify."
         )
     if agent == "opencode":
-        hook = "~/.config/opencode/opencode.json, project ./.opencode/opencode.json"
-        skill = "~/.config/opencode/skill/mex/SKILL.md, project ./.opencode/skill/mex/SKILL.md"
+        skill = "~/.config/opencode/skills/mex/SKILL.md (global), ./.opencode/skills/mex/SKILL.md (project)"
         return (
-            f"Next steps: paste the config in hooks.md into the \"hooks\" field of {agent}'s config "
-            f"({hook} for global); put the content of skill.md into the skill file ({skill} for global)."
+            f"Next steps: the skill is ready at {skill}. "
+            "Start a new session for it to take effect, then ask the agent to run `mex profile` to verify."
         )
     # dsh
     return (

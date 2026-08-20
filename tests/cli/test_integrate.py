@@ -51,12 +51,12 @@ class TestIntegrateCli:
         result = runner.invoke(app, ["integrate", agent, "--scope", scope])
 
         assert result.exit_code == 0, result.stderr
-        assert "hooks.md" in result.stdout and "skill.md" in result.stdout
+        assert "SKILL.md" in result.stdout and "README.md" in result.stdout
         assert "Next steps" in result.stdout
         target = expected_dir(tmp_path, agent, scope)
-        for name in ("hooks.md", "skill.md", "README.md"):
-            assert (target / name).exists()
-            assert str(target / name) in result.stdout
+        for rel in ("skills/mex/SKILL.md", "README.md"):
+            assert (target / rel).exists()
+            assert str(target / rel) in result.stdout
 
     def test_default_scope_is_global(self, mex_home, tmp_path, monkeypatch):
         fake_home(tmp_path, monkeypatch)
@@ -64,7 +64,7 @@ class TestIntegrateCli:
         result = runner.invoke(app, ["integrate", "claude"])
 
         assert result.exit_code == 0, result.stderr
-        assert (tmp_path / ".claude" / "hooks.md").exists()
+        assert (tmp_path / ".claude" / "skills" / "mex" / "SKILL.md").exists()
 
     def test_unknown_agent_exit_1(self, mex_home, tmp_path, monkeypatch):
         fake_home(tmp_path, monkeypatch)
@@ -92,7 +92,7 @@ class TestIntegrateCli:
         data = json.loads(result.stdout)
         assert data["agent"] == "claude"
         assert data["scope"] == "global"
-        assert len(data["written_files"]) == 3
+        assert len(data["written_files"]) == 2
         assert all(p.startswith(str(tmp_path / ".claude")) for p in data["written_files"])
 
     def test_project_scope_in_cwd(self, mex_home, tmp_path, monkeypatch):
@@ -101,7 +101,7 @@ class TestIntegrateCli:
         result = runner.invoke(app, ["integrate", "opencode", "--scope", "project"])
 
         assert result.exit_code == 0, result.stderr
-        assert (tmp_path / ".opencode" / "hooks.md").exists()
+        assert (tmp_path / ".opencode" / "skills" / "mex" / "SKILL.md").exists()
         assert str(tmp_path) in result.stdout
 
     def test_not_initialized_exit_1(self, tmp_path, monkeypatch):

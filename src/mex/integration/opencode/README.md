@@ -2,13 +2,16 @@
 
 > 由 `mex integrate opencode` 生成，生成目录：`{{AGENT_DIR}}`
 
-本目录包含 meX 与 OpenCode 对接所需的 3 个文件：
+本目录包含 meX 与 OpenCode 对接所需的文件：
 
 | 文件 | 用途 |
 |---|---|
-| `hooks.md` | hook 配置说明 + JSON 片段（会话结束自动抽取记忆） |
-| `skill.md` | skill 说明书（教 agent 何时读取 / 写入记忆） |
+| `skills/mex/SKILL.md` | skill 说明书（教 agent 何时读取 / 写入记忆） |
 | `README.md` | 本文件（对接步骤） |
+
+> 说明：OpenCode 目前不支持 Claude Code 风格的"会话结束 hook"（官方配置没有 hooks 字段），
+> 因此本集成不再生成 hook 配置——记忆写入由 skill 引导 agent 在对话中即时完成
+> （用户说"记住这个"时执行 `mex extract`）。hook 自动抽取能力留待后续扩展。
 
 ## 前置条件
 
@@ -17,34 +20,24 @@
 
 ## 对接步骤
 
-### 1. 配置 hook（会话结束自动抽取）
+### 1. 安装 skill（教 agent 用记忆）
 
-打开 `hooks.md`，把其中的 JSON 片段粘贴到 OpenCode 的 `opencode.json`：
+skill 已生成到本目录 `skills/mex/SKILL.md`。OpenCode 从以下位置自动发现 skill：
 
-- 全局（推荐，所有项目生效）：`~/.config/opencode/opencode.json` 的 `"hooks"` 字段
-- 项目级（仅当前项目）：`./.opencode/opencode.json` 的 `"hooks"` 字段
+- 全局（推荐，所有项目生效）：`{{AGENT_DIR}}/skills/mex/SKILL.md`（即 `~/.config/opencode/skills/mex/SKILL.md`）
+- 项目级（仅当前项目）：`./.opencode/skills/mex/SKILL.md`
 
-注意把 JSON 中的 `<会话文件路径>` 替换为实际会话文件路径
-（OpenCode 会话存储在 `~/.local/share/opencode/` 下，按项目分目录）。
+如果生成目录与上述位置一致，直接**重新打开一个 OpenCode 会话**即可生效；
+若不一致，把 `skills/mex/` 目录复制到对应位置。
 
-### 2. 安装 skill（教 agent 用记忆）
+### 2. 验证
 
-把 `skill.md` 的内容放入 skill 文件：
-
-- 全局：`~/.config/opencode/skill/mex/SKILL.md`
-- 项目级：`./.opencode/skill/mex/SKILL.md`
-
-即新建 `mex` 目录并把 `skill.md` 复制为其中的 `SKILL.md`。
-
-### 3. 验证
-
-1. 重新打开一个 OpenCode 会话（让新 hook / skill 生效）。
+1. 重新打开一个 OpenCode 会话（让新 skill 生效）。
 2. 让 agent 执行 `mex profile`，确认能输出用户画像。
-3. 对 agent 说"记住这个 我喜欢喝美式咖啡"，确认它执行
-   `mex extract "我喜欢喝美式咖啡"`。
-4. 结束会话，确认没有报错；运行 `mex list` 能看到新记忆。
+3. 对 agent 说"记住这个：我喜欢喝美式咖啡"，确认它执行 `mex extract "我喜欢喝美式咖啡"`。
+4. 运行 `mex list` 能看到新记忆。
 
 ## 数据与回滚
 
 - 数据目录：`{{MEX_HOME}}`（数据库 `{{DB_PATH}}`，可用 `mex export` 备份）。
-- 想取消集成：删掉 opencode.json 中粘贴的 hook 片段与 skill 目录即可，不影响既有记忆。
+- 想取消集成：删掉 skill 目录（`skills/mex/`）即可，不影响既有记忆。

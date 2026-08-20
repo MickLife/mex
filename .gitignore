@@ -31,5 +31,8 @@ node_modules/
 data/
 mex-dsh-plugin/
 
+# WorkBuddy 项目数据（记忆日志等，含隐私）
+.workbuddy/
+
 # 内部改造计划文档（含个人决策信息，不入库）
 docs/opensource-refactor.md
