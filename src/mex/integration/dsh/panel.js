@@ -4,9 +4,13 @@
  * 职责：
  * 1. 监听 `agent/turn-stopping`（每轮对话即将关闭）——记录该会话"最近一轮
  *    已结束"的对话文本（user/assistant 消息），供面板提示与抽取使用；
- * 2. 面板状态查询：client 轮询该会话是否有未抽取的已结束轮次；
+ * 2. 面板状态查询：client 轮询该会话是否有未抽取的已结束轮次，以及
+ *    最近一次抽取的运行状态（进行中 / 已完成 / 写入条数）；
  * 3. 触发抽取：点击"Add to MeX"后，把未抽取轮次的对话文本 + 抽取 prompt
  *    交给一个全新的子代理（spawn），子代理调用 mex_* 工具写入记忆。
+ *    子代理**保留**（不 dispose）——它作为当前会话的 one-shot 子代理进入
+ *    dsh 侧边栏子代理目录，用户可点开查看调用工具与思考的完整过程；
+ *    抽取完成后由 `subagent/end` 事件标记，供面板展示结果。
  *
  * 通信：通过 webServer 注册两个同源 HTTP 接口（/mex/panel-state、
  * /mex/extract），client half 用 fetch 调用。webServer / subagents /
@@ -38,6 +42,13 @@ const pendingTurns = new Map()
 
 /** 每会话已抽取到的最大 turn 号（内存态；重启后未抽取轮次需重新对话才会补录）。 */
 const extractedTurns = new Map()
+
+/**
+ * 每会话最近一次抽取的运行状态：sessionId → 状态对象。
+ * - 子代理启动后写 { phase: 'running', childSessionId }；
+ * - subagent/end 事件到达后写 { phase: 'done', childSessionId, written, stopReason }。
+ */
+const extractionState = new Map()
 
 /** 从 ContentBlock 数组中提取纯文本。 */
 function textOf(blocks) {
@@ -152,7 +163,22 @@ export function applyMexPanel(ctx) {
     }
   })
 
-  /** GET /mex/panel-state?sessionId=…：面板状态（是否有未抽取的已结束轮次）。 */
+  // 抽取子代理结束（无论成败）：按子代理 session id 关联到父会话，
+  // 标记该轮已抽取（防重复），并记录写入条数供面板展示。
+  ctx.on('subagent/end', (info) => {
+    const entry = extractionState.get(info.id)
+    if (entry === undefined) return
+    const { parentSessionId, turn } = entry
+    extractedTurns.set(parentSessionId, turn)
+    extractionState.set(parentSessionId, {
+      phase: 'done',
+      childSessionId: info.id,
+      written: parseWritten(info.lastAssistantMessage),
+      stopReason: info.stopReason,
+    })
+  })
+
+  /** GET /mex/panel-state?sessionId=…：面板状态（新轮次 + 抽取运行状态）。 */
   const onPanelState = async (req, res) => {
     const sessionId = queryOf(req).sessionId
     if (!sessionId) {
@@ -162,10 +188,17 @@ export function applyMexPanel(ctx) {
     const pending = pendingTurns.get(sessionId)
     const lastTurn = pending ? pending.turn : 0
     const extracted = extractedTurns.get(sessionId) ?? 0
-    sendJson(res, 200, { ok: true, hasNew: lastTurn > extracted, lastTurn, extractedTurn: extracted })
+    const extraction = extractionState.get(sessionId)
+    sendJson(res, 200, {
+      ok: true,
+      hasNew: lastTurn > extracted,
+      lastTurn,
+      extractedTurn: extracted,
+      extraction: extraction ?? null,
+    })
   }
 
-  /** POST /mex/extract body {sessionId}：触发抽取 agent 对话。 */
+  /** POST /mex/extract body {sessionId}：触发抽取 agent 对话（异步，立即返回）。 */
   const onExtract = async (req, res) => {
     const body = await readJsonBody(req)
     const sessionId = body && typeof body.sessionId === 'string' ? body.sessionId : undefined
@@ -178,6 +211,11 @@ export function applyMexPanel(ctx) {
     const pending = pendingTurns.get(sessionId)
     const lastTurn = pending ? pending.turn : 0
     const extracted = extractedTurns.get(sessionId) ?? 0
+    const running = extractionState.get(sessionId)
+    if (running !== undefined && running.phase === 'running') {
+      sendJson(res, 200, { ok: false, error: '上一轮抽取仍在进行中', childSessionId: running.childSessionId })
+      return
+    }
     if (lastTurn <= extracted || !pending) {
       sendJson(res, 200, { ok: false, error: '没有新的已结束对话可抽取' })
       return
@@ -196,14 +234,16 @@ export function applyMexPanel(ctx) {
         signal: controller.signal,
         maxDepth: 3,
       })
-      const result = await run.result
-      // 抽取完成（含"无新增记忆"）：标记该轮已处理，避免重复触发。
-      extractedTurns.set(sessionId, lastTurn)
+      // 记录运行状态；子代理保留（不 dispose），供用户在侧边栏目录查看全程。
+      extractionState.set(sessionId, { phase: 'running', childSessionId: run.id })
+      // 建立 childSessionId → 父会话关联，供 subagent/end 回调标记完成。
+      extractionState.set(run.id, { parentSessionId: sessionId, turn: lastTurn })
       sendJson(res, 200, {
         ok: true,
-        written: parseWritten(result && result.output),
-        stopReason: result && result.stopReason,
-        notes: result && result.stopReason === 'completed' ? undefined : '抽取未正常完成',
+        started: true,
+        childSessionId: run.id,
+        parentSessionId: sessionId,
+        mode: 'one-shot',
       })
     } catch (error) {
       sendJson(res, 200, { ok: false, error: error instanceof Error ? error.message : String(error) })
