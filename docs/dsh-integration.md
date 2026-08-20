@@ -50,24 +50,34 @@
 
 ## 4. 触发链路逐步说明
 
-### 4.0 主题适配（深色 / 浅色 / 跟随系统）
+### 4.0 主题适配（深色 / 浅色 / 跟随系统）与面板拖拽
 
-面板颜色**不使用硬编码色值**，全部引用 dsh 的主题 token（CSS 变量）：
+**主题适配**：面板通过 `document.body.hasAttribute('data-ds-dark-theme')` 判断
+当前实际主题（dsh 主题系统已按偏好——深色 / 浅色 / 跟随系统——归一化该属性），
+并用 `MutationObserver` 监听属性变化（主题切换时即时重渲染）。
 
-| 用途 | token |
-|---|---|
-| 卡片背景 | `var(--dsw-alias-bg-overlay)` |
-| 主文字 | `var(--dsw-alias-label-primary)` |
-| 次要/禁用文字 | `var(--dsw-alias-label-secondary)` |
-| 边框 | `var(--dsw-alias-border-l1)` |
-| 运行中徽标/提示（黄） | `var(--dsw-alias-state-warn-primary)` |
-| 可抽取徽标/提示/按钮（绿） | `var(--dsw-alias-state-success-primary)` |
-| 禁用按钮背景 | `var(--dsw-alias-bg-layer-1)` |
-| 阴影 | `var(--dsw-shadow-lv3, 0 8px 24px rgba(0,0,0,0.28))`（fallback） |
+- **深色主题**：全部使用 dsh 主题 token（CSS 变量），与官方 UI 一致：
 
-dsh 的主题系统（ui-theme）在 `body[data-ds-dark-theme]` 上按当前偏好（深色 / 浅色 /
-跟随系统）解析这些变量的值，面板位于 shell.overlay（body 内），因此颜色**自动跟随
-三种主题**，无需插件感知主题偏好或监听主题切换事件。
+  | 用途 | token |
+  |---|---|
+  | 卡片背景 | `var(--dsw-alias-bg-overlay)` |
+  | 主文字 | `var(--dsw-alias-label-primary)` |
+  | 次要/禁用文字 | `var(--dsw-alias-label-secondary)` |
+  | 边框 | `var(--dsw-alias-border-l1)` |
+  | 运行中徽标/提示（黄） | `var(--dsw-alias-state-warn-primary)` |
+  | 可抽取徽标/提示/按钮（绿） | `var(--dsw-alias-state-success-primary)` |
+  | 禁用按钮背景 | `var(--dsw-alias-bg-layer-1)` |
+  | 阴影 | `var(--dsw-shadow-lv3, fallback)` |
+
+- **浅色主题**（微调，保证可读性）：背景用**非常浅的灰** `#f5f6f8`（比 token
+  的 `bg-overlay` 更浅）；"可加入记忆"的绿色提示加深为 `#15803d`（token 的
+  `state-success-primary` 在浅底上偏亮、对比不足）；主文字 `#1f2328`、次要文字
+  `#6b7280`、边框 `#e3e6ea`、禁用背景 `#e8eaed`。
+
+**面板拖拽**：标题栏（含"⣿"手柄图标）`cursor: move`，按下后跟随鼠标移动
+（`mousemove`/`mouseup` 监听），面板位置改为 `left/top` 固定定位；释放时把
+位置写入 `localStorage['mex-panel-pos']`，下次打开自动恢复。未拖拽时默认
+停靠右下角（`right: 16px; bottom: 16px`）。
 
 ### 4.1 点击按钮 → 浏览器发请求（client.js）
 
