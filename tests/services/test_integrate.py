@@ -38,18 +38,21 @@ def target_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, agent: str, scop
 
 
 class TestIntegrate:
+    # claude/opencode 生成物：skill 说明书（官方 skills/mex/SKILL.md 发现路径）+ README。
+    GENERATED_FILES = ("skills/mex/SKILL.md", "README.md")
+
     @pytest.mark.parametrize("agent", AGENTS)
     @pytest.mark.parametrize("scope", SCOPES)
-    def test_generates_three_files(self, mex_home, tmp_path, monkeypatch, agent, scope):
+    def test_generates_skill_and_readme(self, mex_home, tmp_path, monkeypatch, agent, scope):
         expected = target_dir(tmp_path, monkeypatch, agent, scope)
 
         result = integrate(agent, scope)
 
         assert result.agent == agent and result.scope == scope
-        assert len(result.written_files) == 3
-        for name in ("hooks.md", "skill.md", "README.md"):
-            assert (expected / name).exists()
-            assert str(expected / name) in result.written_files
+        assert len(result.written_files) == 2
+        for rel in self.GENERATED_FILES:
+            assert (expected / rel).exists()
+            assert str(expected / rel) in result.written_files
 
     @pytest.mark.parametrize("agent", AGENTS)
     @pytest.mark.parametrize("scope", SCOPES)
@@ -58,9 +61,9 @@ class TestIntegrate:
 
         integrate(agent, scope)
 
-        for name in ("hooks.md", "skill.md", "README.md"):
-            content = (expected / name).read_text(encoding="utf-8")
-            assert "{{" not in content, f"{name} 仍含未替换占位符"
+        for rel in self.GENERATED_FILES:
+            content = (expected / rel).read_text(encoding="utf-8")
+            assert "{{" not in content, f"{rel} 仍含未替换占位符"
             assert str(mex_home) in content
             assert "mex.db" in content
 
@@ -72,9 +75,9 @@ class TestIntegrate:
         second = integrate(agent, "project")
 
         assert first.written_files == second.written_files
-        for name in ("hooks.md", "skill.md", "README.md"):
-            assert (expected / name).exists()
-        assert "{{" not in (expected / "skill.md").read_text(encoding="utf-8")
+        for rel in self.GENERATED_FILES:
+            assert (expected / rel).exists()
+        assert "{{" not in (expected / "skills" / "mex" / "SKILL.md").read_text(encoding="utf-8")
 
     def test_not_initialized_raises(self, tmp_path, monkeypatch):
         monkeypatch.setenv("MEX_HOME", str(tmp_path))
