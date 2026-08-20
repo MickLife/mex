@@ -23,7 +23,7 @@ AI agent 越来越强，但它记不住你：新开一段对话，agent 就"失�
 ## meX 的核心优势
 
 - 完全的数据掌控：meX 部署于你的本地设备，隐私不泄露
-- 不同的 agent 之间共享：让你的不同 agent 之间共享同一份记忆（已支持deepseek-harness)
+- 不同的 agent 之间共享：让你的不同 agent 之间共享同一份记忆（已支持 Claude Code / OpenCode / WorkBuddy / DeepSeek Harness）
 - 个人画像系统：由 schema 定义个人画像，记忆遵循唯一事实原则，可扩展，易维护，易使用
 - 易于管理：提供增删改查、遗忘、人工 review 等 cli 命令，便于 agent 调用；
 - 证据关联：可溯源记忆的生成原因、遗忘原因、操作历史，可恢复
@@ -151,13 +151,14 @@ topics:
 
 AI 抽取时只能打后四档；`confirmed` 只能由人产生。低置信条目在 `mex profile` 输出中标注"（待确认）"。
 
-## 与 agent 集成（OpenCode / Claude Code / dsh）
+## 与 agent 集成（Claude Code / OpenCode / WorkBuddy / dsh）
 
-`mex integrate` 一键生成与 agent 的对接文件（hook 配置 + skill 说明书 / DSH 插件 bundle），详细对接步骤见对应内层文档：
+`mex integrate` 一键生成与 agent 的对接文件（skill 说明书 + README / DSH 插件 bundle），详细对接步骤见对应内层文档：
 
 ```bash
 mex integrate claude --scope global     # 全局：所有项目生效（默认）
 mex integrate opencode --scope project  # 仅当前项目生效
+mex integrate workbuddy --scope project # 生成 WorkBuddy skill 到 ./.workbuddy/skills/
 mex integrate dsh --scope project       # 生成 DSH 插件 bundle ./mex-dsh-plugin
 ```
 
@@ -165,6 +166,7 @@ mex integrate dsh --scope project       # 生成 DSH 插件 bundle ./mex-dsh-plu
 |---|---|
 | Claude Code | [src/mex/integration/claude/README.md](src/mex/integration/claude/README.md) |
 | OpenCode | [src/mex/integration/opencode/README.md](src/mex/integration/opencode/README.md) |
+| WorkBuddy | [src/mex/integration/workbuddy/README.md](src/mex/integration/workbuddy/README.md) |
 | DeepSeek Harness（dsh） | [src/mex/integration/dsh/README.md](src/mex/integration/dsh/README.md)（含开发者更新插件流程） |
 
 ## 配置

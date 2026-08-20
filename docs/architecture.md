@@ -781,11 +781,15 @@ mex integrate claude --scope global     # 生成到 ~/.claude/
 mex integrate claude --scope project    # 生成到 ./.claude/
 mex integrate opencode --scope global   # 生成到 ~/.config/opencode/
 mex integrate opencode --scope project  # 生成到 ./.opencode/
+mex integrate workbuddy --scope global  # 生成到 ~/.workbuddy/skills/
+mex integrate workbuddy --scope project # 生成到 ./.workbuddy/skills/
 ```
 
 - `--scope project`（项目级）：配置生成到当前项目目录，只对该目录下的 agent 会话生效。
 - `--scope global`（全局，**默认**）：生成到用户级配置目录，对所有项目的会话生效。
-- 生成内容：skill 说明书（写入官方 `skills/<name>/SKILL.md` 发现路径）+ README（对接步骤）。
+- 生成内容：skill 说明书 + README（对接步骤）。skill 的写入位置按 agent 不同：
+  claude/opencode 写入官方 `skills/<name>/SKILL.md` 发现路径；workbuddy 的目标目录
+  （`~/.workbuddy/skills` / `./.workbuddy/skills`）本身就是 skill 根目录，直接写 `mex/SKILL.md`。
   不再生成 hook 配置——OpenCode 官方配置 schema 无 hooks 字段，会话结束自动抽取留待后续扩展（ADR-12）。
 - 执行后输出实际写入的文件路径清单，便于检查；重复执行覆盖旧文件（幂等）。
 
