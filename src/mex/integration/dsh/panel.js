@@ -189,9 +189,15 @@ export function applyMexPanel(ctx) {
     const lastTurn = pending ? pending.turn : 0
     const extracted = extractedTurns.get(sessionId) ?? 0
     const extraction = extractionState.get(sessionId)
+    // 对话进行中（等待模型输出 / 执行工具）不算"已结束的新轮次"：
+    // hasNew 仅在 agent 空闲且存在未抽取的已结束轮次时为 true。
+    const agents = ctx.get('agents')
+    const parent = agents === undefined ? undefined : agents.get(sessionId)
+    const agentRunning = parent !== undefined && parent.status === 'running'
     sendJson(res, 200, {
       ok: true,
-      hasNew: lastTurn > extracted,
+      hasNew: lastTurn > extracted && !agentRunning,
+      agentRunning,
       lastTurn,
       extractedTurn: extracted,
       extraction: extraction ?? null,
@@ -223,6 +229,11 @@ export function applyMexPanel(ctx) {
     const parent = agents.get(sessionId)
     if (parent === undefined) {
       sendJson(res, 200, { ok: false, error: '会话未激活（agent 不在运行中）' })
+      return
+    }
+    // 对话进行中（等待模型输出 / 执行工具）：本轮尚未结束，拒绝抽取。
+    if (parent.status === 'running') {
+      sendJson(res, 200, { ok: false, error: '对话仍在进行中，请等本轮结束后再抽取' })
       return
     }
     const controller = new AbortController()

@@ -118,8 +118,11 @@ window.__ModuleLoader__.load({
       var extraction = panel !== null ? (panel.extraction || null) : null
       var running = extraction !== null && extraction.phase === 'running'
       var done = extraction !== null && extraction.phase === 'done'
+      // agentRunning：当前对话正在进行（等待模型输出 / 执行工具），
+      // 本轮尚未结束，按钮不可用、不算"有新轮次可抽取"。
+      var agentRunning = panel !== null && panel.ok === true && panel.agentRunning === true
       var hasNew = panel !== null && panel.ok === true && panel.hasNew === true
-      var canRun = sessionId !== undefined && !busy && !running
+      var canRun = sessionId !== undefined && !busy && !running && !agentRunning
 
       // 面板卡片：固定右下角，深色底，紧凑布局。
       var cardStyle = {
@@ -185,10 +188,13 @@ window.__ModuleLoader__.load({
         fontSize: '12px',
       }
 
-      // 提示文本：优先运行状态，其次抽取完成，其次可抽取，兜底引导。
+      // 提示文本：优先抽取运行状态，其次对话进行中，其次抽取完成，
+      // 再次可抽取，兜底引导。
       var hintText
       if (running) {
         hintText = '抽取中…点击下方按钮查看运行过程'
+      } else if (agentRunning) {
+        hintText = '对话进行中，本轮结束后可加入记忆'
       } else if (done) {
         hintText = '抽取完成：已写入 ' + (extraction.written || 0) + ' 条记忆'
       } else if (hasNew) {

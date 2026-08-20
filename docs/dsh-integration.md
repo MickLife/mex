@@ -199,6 +199,7 @@ ctx.on('subagent/end', (info) => {
 | 用子代理而非直接调 `mex extract` | 需求要求"触发一轮新的 agent 对话"；子代理是 dsh 的隔离 agent 机制，能看到 mex 工具但看不到主对话上下文——安全且不干扰当前对话 |
 | prompt 参考 prompts.py 但改写成"工具指令" | prompts.py 是给 `mex extract` 用的（输出 JSON 让代码解析）；本场景 agent 自主**操作工具**，所以 prompt 是"规范 + 操作步骤" |
 | 每轮一个对话文本 + `extractedTurns` 防重复 | 避免同一轮对话被反复抽取写脏数据 |
+| `agent.status === 'running'` 门控 `hasNew` | 对话进行中（等待模型输出 / 执行工具，如 deep diving）**不算**"已结束的新轮次"——此时 `hasNew=false`、按钮禁用、`extract` 接口拒绝，避免用户在对话未结束时误触发抽取 |
 | 子代理保留 + `openSubagent` 打开会话视图 | 抽取过程**透明可见**：用户实时看到工具调用与思考，不再是黑盒；完成后仍可回看 |
 | 异步触发（不 `await run.result`）+ `subagent/end` 完成标记 | HTTP 立即返回、不阻塞请求；完成状态由事件驱动，面板轮询展示 |
 | `ctx.inject(['webServer'], cb)` 等待路由注册 | bundle 插件 apply 时机可能早于 webServer 服务注册（Cordis 按 inject 依赖激活，mex 只依赖 subprocess/tools）；一次性 `ctx.get('webServer')` 会拿到 undefined 导致路由永不注册、请求落到 SPA fallback（曾导致 405 空 body、前端 `Unexpected end of JSON input`）。headless 无 webServer 时回调不执行、不影响 mex 工具 |
@@ -208,7 +209,7 @@ ctx.on('subagent/end', (info) => {
 
 | 接口 | 方法 | 入参 | 返回 |
 |---|---|---|---|
-| `/mex/panel-state` | GET | `sessionId` query | `{ ok, hasNew, lastTurn, extractedTurn, extraction }`（`extraction` 为 `{ phase: 'running'\|'done', childSessionId, written?, stopReason? }`） |
+| `/mex/panel-state` | GET | `sessionId` query | `{ ok, hasNew, agentRunning, lastTurn, extractedTurn, extraction }`（`agentRunning`：当前对话是否进行中——进行中 `hasNew` 恒为 `false`；`extraction` 为 `{ phase: 'running'\|'done', childSessionId, written?, stopReason? }`） |
 | `/mex/extract` | POST | body `{ sessionId }` | `{ ok, started, childSessionId, parentSessionId, mode: 'one-shot' }`（异步触发，立即返回） |
 
 同源 HTTP（webServer 注册 exact route），Client half 用 fetch 调用。
