@@ -1,0 +1,35 @@
+# IDE
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.coverage
+htmlcov/
+.coverage.*
+
+# 虚拟环境
+.venv/
+venv/
+
+# Node.js（DSH 插件等）
+node_modules/
+
+# 环境变量（可能含密钥，禁止入库）
+.env
+
+# 本地数据（meX 运行时数据目录，含隐私）
+.mex/
+# 开发冒烟数据目录（AGENTS.md 约定）
+.mex-dev/
+# 数据目录整体不入库（tmp 缓存、docs_bak 隐私备份等）
+data/
+mex-dsh-plugin/
+
+# 内部改造计划文档（含个人决策信息，不入库）
+docs/opensource-refactor.md

@@ -1,0 +1,268 @@
+# meX 默认画像 schema（学生 + 职场人群一体版，覆盖约 20~50 岁使用需求）
+# 新增领域或字段 = 编辑本文件（保存后重启命令即生效）
+# 修改后可用 `mex doctor` 检查已有数据与新 schema 的一致性
+# 设计目标：12 个领域聚合覆盖主要场景，尽量少让用户手动加字段；
+# 碎片化/临时信息省略 sub_topic 写为画像外记录（mex add --topic finance --content "..."），
+# 不进画像、按时间索引；领域内没有合适字段时同样省略 sub_topic，写入领域级记录
+#
+# 字段唯一性（unique，默认 true，省略即唯一）：
+# - 唯一（省略 unique）：当前态字段，只有一个当前值，新值覆盖旧值。如 name、当前职位、现居地。
+# - 可多条（unique: false）：积累态字段，保留所有历史值，追加不覆盖，每条独立。
+#
+# 结构化字段（fields 声明）：该字段每条记录的 content 是一个 JSON 对象，
+# 键为 fields 的键、值统一为字符串、键序即展示顺序。用于「一段完整经历/成果」。
+# 示例：work.experience 的一条 content：
+#   {"start": "2019", "end": "2023", "company": "阿里", "position": "后端工程师",
+#    "department": "交易部门", "summary": "订单系统重构", "kind": "全职"}
+topics:
+  basic_info:
+    description: 基础信息
+    sub_topics:
+      name:        { description: 姓名 }
+      gender:      { description: 性别 }
+      birth_year:  { description: 出生年份 }
+      hometown:    { description: 籍贯 }
+      location:    { description: 现居地 }
+      cultural_background: { description: 文化背景 }     # 如：汉族，北方文化背景
+      language_habit:      { description: 日常语言使用习惯 }  # 如：日常中文，技术讨论中英混杂（与 edu.language 语言能力区分）
+      life_stage:          { description: 人生阶段 }     # 如：大三学生 / 新手妈妈 / 待业中
+  work:
+    description: 工作与职业（含创业与开源）
+    sub_topics:
+      # 当前状态（唯一）
+      position:      { description: 当前职位 }
+      company:       { description: 当前公司 }
+      work_mode:     { description: 工作模式（远程/混合/到岗） }
+      salary:        { description: 薪酬情况 }
+      # 经历积累（可多条）
+      experience:    # 工作/实习经历：每段一条
+        description: 工作经历
+        unique: false
+        fields:
+          start:
+            description: 开始时间
+            format: time
+            required: true
+          end:
+            description: 结束时间    # 至今写"至今"
+            format: time
+            required: true
+          company:
+            description: 公司名
+            required: true
+          position:
+            description: 职位
+            required: true
+          department: 部门
+          summary:   内容概要
+          kind:      类型（全职/实习）
+          leave_reason: 离职原因    # 可选，如「追求更大平台」
+      projects:      # 工作中的项目：每个一条
+        description: 项目经历
+        unique: false
+        fields:
+          start:
+            description: 开始时间
+            format: time
+            required: true
+          end:
+            description: 结束时间    # 至今写"至今"
+            format: time
+            required: true
+          name:
+            description: 项目名
+            required: true
+          role:     担任角色
+          overview: 项目概况
+          detail:   项目详情
+      tech_stack:    { description: 技术栈/技能, unique: false }   # 每个技能一条
+      # 创业（startup_ 前缀）
+      startup_status:    { description: 创业状态 }
+      startup_projects:  { description: 创业项目, unique: false }
+      startup_ideas:     { description: 创业想法与灵感, unique: false }
+      # 开源与社区（oss_ 前缀）
+      oss_projects:      { description: 开源项目, unique: false }
+      oss_contributions: { description: 社区贡献, unique: false }
+      oss_profile:       { description: 开源主页（GitHub/Gitee 等） }
+      # 职业发展（goal_ 前缀）
+      goal_current:    { description: 当前职业目标 }
+      goal_long_term:  { description: 长期职业规划 }
+      relocation_plan: { description: 定居或迁移计划 }
+      job_search:      # 求职状态与偏好（结构化，所有键可选，可只填部分）
+        description: 求职状态与偏好
+        fields:
+          status:             求职状态      # 在职看机会/主动求职/暂不考虑
+          expected_industry:  期望行业
+          expected_position:  期望岗位
+          expected_salary:    期望薪资
+          work_intensity:     可接受工作强度
+          forbidden_companies: 禁忌公司
+      soft_skill:      { description: 软技能, unique: false }  # 如：跨部门沟通 / 公开演讲
+      award:           # 职场荣誉/奖项：每个奖项一条
+        description: 职场荣誉与奖项
+        unique: false
+        fields:
+          name:
+            description: 奖项名称
+            required: true
+          level:  级别          # 如：部门级/公司级/集团级
+          year:
+            description: 年份
+            format: time
+            required: true
+          issuer: 颁发机构
+  edu:
+    description: 教育背景
+    sub_topics:
+      education:
+        description: 教育经历
+        unique: false
+        fields:
+          start:
+            description: 开始时间
+            format: time
+            required: true
+          end:
+            description: 结束时间    # 在读写"至今"
+            format: time
+            required: true
+          degree:
+            description: 学历        # 如：本科/硕士/博士
+            required: true
+          school:
+            description: 学校
+            required: true
+          major:   专业
+      language:    { description: 语言能力, unique: false }       # 每条一个语言（含等级，如"英语 六级 520"）
+      certificate: { description: 证书/资格, unique: false }      # 每个证书一条（如 教资、CFA、驾照）
+      focus:       { description: 教育聚焦方向 }   # 如：自然语言处理 / 核心课程：数据结构、操作系统
+  research:
+    description: 科研成果与荣誉
+    sub_topics:
+      paper:
+        description: 论文
+        unique: false
+        fields:
+          title:
+            description: 标题
+            required: true
+          venue:   期刊/会议
+          year:
+            description: 年份
+            format: time
+            required: true
+          authors: 作者        # 标注本人位次，如"张三(一作)、李四"
+          status:  状态        # 如：已发表/在投
+      patent:
+        description: 专利
+        unique: false
+        fields:
+          name:
+            description: 专利名称
+            required: true
+          type:   类型          # 如：发明/实用新型/外观
+          year:
+            description: 年份
+            format: time
+            required: true
+          status: 状态          # 如：已授权/审查中
+      award:
+        description: 学术/科研获奖   # 学业、竞赛、科研类奖项；职场荣誉请用 work.award
+        unique: false
+        fields:
+          name:
+            description: 奖项名称
+            required: true
+          level:  级别          # 如：校级/省级/国家级/国际
+          year:
+            description: 年份
+            format: time
+            required: true
+          issuer: 颁发机构
+  finance:
+    description: 理财与财务
+    sub_topics:
+      income:         { description: 收入结构 }
+      assets:         { description: 资产与负债概览 }
+      investment:     { description: 投资持仓与策略, unique: false }
+      financial_goal: { description: 财务目标 }
+  family:
+    description: 家庭
+    sub_topics:
+      status:  { description: 家庭状况 }
+      members: { description: 家庭成员情况, unique: false }
+      plan:    { description: 家庭计划（购房/生育/照顾父母等） }
+      relationships:  # 核心人际关系及质量（家人/伴侣/导师等），每条一个关系
+        description: 核心人际关系及质量
+        unique: false
+        fields:
+          relation:
+            description: 关系
+            required: true   # 如：母亲/伴侣/导师
+          quality:
+            description: 关系质量或状态
+            required: true
+  relationship:
+    description: 感情与恋爱
+    sub_topics:
+      status:      { description: 感情状态 }
+      partner:     { description: 伴侣情况 }
+      milestones:  { description: 关系里程碑（见家长/订婚等）, unique: false }
+      plan:        { description: 感情计划（结婚等） }
+  leisure:
+    description: 休闲生活（爱好与旅行）
+    sub_topics:
+      hobbies:  { description: 兴趣爱好, unique: false }
+      creative: { description: 创作类爱好（写作/绘画/乐器/剪辑等）, unique: false }
+      travel_plans:    { description: 出行计划, unique: false }
+      travel_wishlist: { description: 想去的地方, unique: false }
+  health:
+    description: 运动健康
+    sub_topics:
+      status:   { description: 健康状况 }
+      exercise: { description: 运动锻炼情况 }
+      checkup:  { description: 体检结果与异常项, unique: false }
+      concern:  { description: 健康担忧, unique: false }
+  values:
+    description: 三观与原则
+    sub_topics:
+      values:     { description: 核心价值观, unique: false }
+      principles: { description: 行事原则, unique: false }
+      life_goal:  { description: 人生目标 }
+      # 心理与价值观图谱：情感陪伴、人生决策辅助等场景的关键画像
+      personality:     { description: 性格倾向 }    # 如 MBTI / 大五人格特征
+      risk_preference: { description: 风险偏好 }    # 理财与人生决策通用，如「稳健偏保守」
+      decision_style:  { description: 认知与决策风格 }  # 如「数据驱动、深思熟虑」
+      emotion_triggers:  # 情绪触发点：什么话题会引发何种情绪
+        description: 情绪触发点
+        unique: false
+        fields:
+          trigger:
+            description: 触发话题或情境
+            required: true
+          reaction:
+            description: 情绪反应    # 兴奋/焦虑/愤怒/抑郁等
+            required: true
+      bottom_line:      { description: 底线, unique: false }  # 绝对不能接受的底线，如「不接受长期 996」
+  interaction:
+    description: 交互偏好   # 告诉 agent 如何与用户对话：沟通风格、信息密度、反馈方式、行为习惯
+    sub_topics:
+      communication_style: { description: 沟通风格偏好 }   # 结论先行/循序渐进；正式/幽默/毒舌等
+      info_density:        { description: 信息密度偏好 }   # 深度长文/要点速读清单
+      feedback_style:      { description: 对 AI 犯错的反馈偏好与肯定表达方式 }
+      behavior_habits:     { description: 行为习惯与痛点, unique: false }
+  goals:
+    description: 目标与计划
+    sub_topics:
+      short_term_goal:        # 短期目标（1-6 个月）：跨领域（职业/健康/理财），带截止时间，每条一个目标
+        description: 短期目标
+        unique: false
+        fields:
+          goal:
+            description: 目标内容
+            required: true
+          deadline:
+            description: 截止时间
+            format: time
+            required: true
+          domain:  所属领域     # 职业/健康/理财/学习等

@@ -1,0 +1,12 @@
+# meX 配置
+# 优先级：环境变量 > 本文件 > 内置默认值
+llm:
+  base_url: ""          # OpenAI 兼容 API 端点（运行 `mex config llm` 配置）
+  api_key: ""           # API Key（明文存储于本文件，权限 600 仅本人可读）
+  api_key_env: ""       # 可选：环境变量名，设置后优先于 api_key（CI/脚本场景）
+  model: ""
+  timeout_seconds: 600
+  max_retries: 3        # 超时/限流/服务端错误的最大重试次数
+  retry_base_seconds: 2 # 指数退避基数：2s → 4s → 8s
+profile:
+  max_tokens: 3000      # mex profile 默认输出上限；可被 --max-tokens 覆盖

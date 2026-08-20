@@ -1,0 +1,21 @@
+{
+  "name": "mex-dsh-plugin",
+  "version": "0.1.0",
+  "description": "meX 个人记忆系统的 DeepSeek Harness 插件：把 mex CLI 命令镜像成原生工具（读/写/审查）。",
+  "type": "module",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json"
+  },
+  "files": ["index.js", "cordis.patch.yml", "README.md"],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "peerDependencies": {
+    "cordis": ">=4.0.0-rc <5"
+  },
+  "license": "MIT"
+}

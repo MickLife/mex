@@ -1,0 +1,7 @@
+# mex-dsh-plugin bundle patch
+# 在 DSH profile 装配树插入本插件行，使 Host half 加载 index.js，
+# 并把 meX 的读/写/审查命令注册成原生 Tool。
+- insert:
+    - id: mex
+      name: mex-dsh-plugin
+      config: {}
