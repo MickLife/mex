@@ -73,6 +73,9 @@ Client half（`client.js`）注册到 `shell.overlay` 浮动层并调用这两�
 
 > **注意**：抽取依赖 spawn 子代理（`dsh-subagent-spawn-in-process`，dsh 默认
 > 装配），且每次抽取以"最近一轮对话"为单位——多轮未点只抽取最近一轮，点一次抽一轮。
+>
+> **完整实现细节**（触发链路、prompt 设计、防重复机制、与 ADR-12 的关系等）
+> 见设计文档 [`docs/dsh-integration.md`](../../../../docs/dsh-integration.md)。
 
 ## 提供的工具（13 个）
 
