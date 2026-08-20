@@ -2,7 +2,6 @@
 
 > 适用对象：mex-dsh-plugin（DeepSeek Harness 插件）。
 > 本文档记录 dsh 侧集成**实现细节**，与 `architecture.md` §8 的 agent 集成章节互补：
-> §8 描述 claude/opencode 的 skill 机制（即时写 + 会话结束 hook 留待扩展）；
 > 本文描述 dsh 特有形态——浏览器 UI 面板 + 用户主动触发的"每轮对话后抽取"。
 > 接口以代码 docstring 为准；本文是设计说明，不替代代码。
 
