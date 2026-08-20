@@ -216,24 +216,25 @@ def list_by_slot(
     return [memory_from_row(r) for r in conn.execute(sql, params).fetchall()]
 
 
-def list_all(
-    conn: sqlite3.Connection,
+def _list_where_clause(
     *,
-    topic: str | None = None,
-    sub_topic: str | None = None,
-    include_forgotten: bool = False,
-    now: str | None = None,
-) -> list[Memory]:
-    """列出记忆：created_at 倒序（新→旧），稳定排序（同时间按 id）。默认排除已过期记录。
+    topic: str | None,
+    sub_topic: str | None,
+    include_forgotten: bool,
+    now: str | None,
+) -> tuple[str, list[object]]:
+    """list_all / count_all 共用的 WHERE 子句与绑定参数（含过期惰性过滤）。
 
     Args:
-        conn: 连接。
         topic: 仅返回该领域。
         sub_topic: 仅返回该字段（须配合 topic；None 表示不按字段过滤）。
         include_forgotten: 是否包含软删条目。
         now: 当前时间（UTC ISO，默认取系统当前；测试注入用）。
+
+    Returns:
+        ``(sql_where, params)``：以 `` WHERE ...`` 开头的过滤子句与绑定参数。
     """
-    sql = f"SELECT * FROM memories WHERE 1=1 AND {_EXPIRED_GUARD}"  # noqa: S608 - 内插受控常量
+    sql = f" WHERE 1=1 AND {_EXPIRED_GUARD}"  # noqa: S608 - 内插受控常量
     params: list[object] = [_now_bound(now)]
     if topic is not None:
         sql += " AND topic = ?"
@@ -244,8 +245,75 @@ def list_all(
         params.append(sub_topic)
     if not include_forgotten:
         sql += " AND forgotten_at IS NULL"
-    sql += " ORDER BY created_at DESC, id"
+    return sql, params
+
+
+def list_all(  # noqa: PLR0913 - 过滤/分页参数语义独立，打包 dataclass 反而牺牲可读性
+    conn: sqlite3.Connection,
+    *,
+    topic: str | None = None,
+    sub_topic: str | None = None,
+    include_forgotten: bool = False,
+    limit: int | None = None,
+    offset: int = 0,
+    now: str | None = None,
+) -> list[Memory]:
+    """列出记忆：created_at 倒序（新→旧），稳定排序（同时间按 id）。默认排除已过期记录。
+
+    支持 SQL 层分页：``limit`` 非 None 且 > 0 时返回前 limit 条，``offset`` 跳过前
+    offset 条（配合 ``limit`` 翻页；单独给 ``offset`` 时按 ``LIMIT -1 OFFSET ?``
+    只做偏移不截断）。``limit`` 为 None 或 0 表示不限制条数。
+
+    Args:
+        conn: 连接。
+        topic: 仅返回该领域。
+        sub_topic: 仅返回该字段（须配合 topic；None 表示不按字段过滤）。
+        include_forgotten: 是否包含软删条目。
+        limit: 返回条数上限；None 或 0 表示全部。
+        offset: 跳过的前 N 条（0 表示从头开始）。
+        now: 当前时间（UTC ISO，默认取系统当前；测试注入用）。
+    """
+    where, params = _list_where_clause(
+        topic=topic, sub_topic=sub_topic, include_forgotten=include_forgotten, now=now,
+    )
+    sql = "SELECT * FROM memories" + where + " ORDER BY created_at DESC, id"  # noqa: S608 - where 来自 _list_where_clause 受控拼接
+    if limit is not None and limit > 0:
+        sql += " LIMIT ?"
+        params.append(limit)
+        if offset > 0:
+            sql += " OFFSET ?"
+            params.append(offset)
+    elif offset > 0:
+        sql += " LIMIT -1 OFFSET ?"
+        params.append(offset)
     return [memory_from_row(r) for r in conn.execute(sql, params).fetchall()]
+
+
+def count_all(
+    conn: sqlite3.Connection,
+    *,
+    topic: str | None = None,
+    sub_topic: str | None = None,
+    include_forgotten: bool = False,
+    now: str | None = None,
+) -> int:
+    """统计与 :func:`list_all` 相同过滤条件下的有效条目总数（分页提示用）。
+
+    Args:
+        conn: 连接。
+        topic: 仅统计该领域。
+        sub_topic: 仅统计该字段（须配合 topic；None 表示不按字段过滤）。
+        include_forgotten: 是否包含软删条目。
+        now: 当前时间（UTC ISO，默认取系统当前；测试注入用）。
+
+    Returns:
+        命中过滤条件的条目总数（不受 limit/offset 影响）。
+    """
+    where, params = _list_where_clause(
+        topic=topic, sub_topic=sub_topic, include_forgotten=include_forgotten, now=now,
+    )
+    row = conn.execute("SELECT COUNT(*) AS n FROM memories" + where, params).fetchone()  # noqa: S608 - where 来自 _list_where_clause 受控拼接
+    return int(row["n"])
 
 
 def list_recent_outside(

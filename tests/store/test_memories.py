@@ -206,6 +206,39 @@ class TestQueries:
         assert len(memories.list_all(conn)) == 3
         assert len(memories.list_all(conn, topic="work")) == 2
 
+    def test_list_all_limit_and_offset(self, conn):
+        """list_all SQL 层分页：limit 截断、offset 跳过、组合翻页、limit=0 表示全部。"""
+        with transaction(conn):
+            for i in range(5):
+                memories.insert(
+                    conn,
+                    make_memory(
+                        id=f"m-{i}",
+                        topic=None,
+                        sub_topic=None,
+                        content=f"记录{i}",
+                        created_at=f"2026-01-0{i + 1}T00:00:00Z",
+                    ),
+                )
+        # created_at 倒序：m-4 最新在前
+        assert [m.id for m in memories.list_all(conn, limit=2)] == ["m-4", "m-3"]
+        assert [m.id for m in memories.list_all(conn, limit=2, offset=2)] == ["m-2", "m-1"]
+        assert [m.id for m in memories.list_all(conn, offset=3)] == ["m-1", "m-0"]  # 只偏移不截断
+        assert [m.id for m in memories.list_all(conn, limit=0)] == ["m-4", "m-3", "m-2", "m-1", "m-0"]
+        assert memories.list_all(conn, limit=None) == memories.list_all(conn, limit=0)
+
+    def test_count_all_matches_list_all_filters(self, conn):
+        """count_all 与 list_all 同过滤条件统计总数，不受分页影响。"""
+        with transaction(conn):
+            memories.insert(conn, make_memory(id="a", topic="work", sub_topic="company"))
+            memories.insert(conn, make_memory(id="b", topic="work", sub_topic="tech_stack", content="Python"))
+            memories.insert(conn, make_memory(id="c", topic=None, sub_topic=None, content="随手记"))
+            memories.forget(conn, "b", "x")
+        assert memories.count_all(conn) == 2
+        assert memories.count_all(conn, topic="work") == 1
+        assert memories.count_all(conn, topic="work", include_forgotten=True) == 2
+        assert len(memories.list_all(conn, limit=1)) == 1  # 分页只影响返回条数
+
     def test_list_forgotten(self, conn):
         with transaction(conn):
             memories.insert(conn, make_memory(id="a"))
