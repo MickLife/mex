@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import stat
 from pathlib import Path
 
@@ -433,6 +434,123 @@ class TestList:
         # --json 保持原始 JSON 字符串
         data = json.loads(_invoke("list", "--json").stdout)
         assert '"start"' in data[0]["content"]
+
+    # ---- 分页：默认 10 条 / --limit / --offset / --all ----
+
+    def _seed_many(self, mex_home: str, n: int) -> None:
+        """插入 n 条画像外记录，固定 created_at 递增（记录1 最旧 → 记录n 最新）。"""
+        _init()
+        for i in range(1, n + 1):
+            _add(topic="finance", content=f"记录{i}")
+        conn = connect(Path(mex_home) / "mex.db")
+        try:
+            for i in range(1, n + 1):
+                conn.execute(
+                    "UPDATE memories SET created_at = ? WHERE content = ?",
+                    (f"2026-01-{i:02d}T00:00:00Z", f"记录{i}"),
+                )
+            conn.commit()
+        finally:
+            conn.close()
+
+    def test_default_limit_10(self, mex_home):
+        """默认只打印最近 10 条，并提示剩余条数与翻页命令。"""
+        self._seed_many(mex_home, 12)
+        result = _invoke("list")
+        assert result.exit_code == 0
+        assert "记录12" in result.stdout and "记录3" in result.stdout  # 最新的 10 条
+        # 最旧的 2 条被截断（用行匹配避免 "记录12" 含子串 "记录1" 误判）
+        assert not re.search(r"^\s*记录[12]$", result.stdout, flags=re.M)
+        assert "Showing 1-10 of 12" in result.stdout
+        assert "--offset 10" in result.stdout
+
+    def test_limit_option(self, mex_home):
+        self._seed_many(mex_home, 5)
+        result = _invoke("list", "--limit", "2")
+        assert "记录5" in result.stdout and "记录4" in result.stdout
+        assert "记录3" not in result.stdout
+        assert "Showing 1-2 of 5" in result.stdout
+
+    def test_offset_pagination(self, mex_home):
+        """第 2 页：--offset 10 显示 11-12 条，序号从 11 连续编号。"""
+        self._seed_many(mex_home, 12)
+        result = _invoke("list", "--offset", "10")
+        assert result.exit_code == 0
+        assert re.search(r"^\s*记录2$", result.stdout, flags=re.M) is not None
+        assert re.search(r"^\s*记录1$", result.stdout, flags=re.M) is not None
+        assert re.search(r"^\s*记录3$", result.stdout, flags=re.M) is None  # 第 1 页的条目不在本页
+        assert "Showing" not in result.stdout  # 已到最后一页，无翻页提示
+        assert "11. " in result.stdout and "12. " in result.stdout
+
+    def test_offset_with_limit(self, mex_home):
+        """--limit 与 --offset 组合翻页：第 2 页 2 条，编号从 3 开始。"""
+        self._seed_many(mex_home, 6)
+        result = _invoke("list", "--limit", "2", "--offset", "2")
+        assert "记录4" in result.stdout and "记录3" in result.stdout
+        assert "记录5" not in result.stdout
+        assert "Showing 3-4 of 6" in result.stdout
+
+    def test_all_flag(self, mex_home):
+        """--all 打印全部且不再提示翻页。"""
+        self._seed_many(mex_home, 12)
+        result = _invoke("list", "--all")
+        assert result.exit_code == 0
+        assert "记录1" in result.stdout and "记录12" in result.stdout
+        assert "Showing" not in result.stdout
+
+    def test_limit_zero_means_all(self, mex_home):
+        """--limit 0 等价 --all。"""
+        self._seed_many(mex_home, 12)
+        result = _invoke("list", "--limit", "0")
+        assert "记录1" in result.stdout and "记录12" in result.stdout
+        assert "Showing" not in result.stdout
+
+    def test_all_with_offset(self, mex_home):
+        """--all 可与 --offset 组合（跳过最新的 N 条后打印剩余全部）。"""
+        self._seed_many(mex_home, 5)
+        result = _invoke("list", "--all", "--offset", "2")
+        assert re.search(r"^\s*记录5$", result.stdout, flags=re.M) is None  # 最新的 2 条被跳过
+        assert re.search(r"^\s*记录4$", result.stdout, flags=re.M) is None
+        assert "记录3" in result.stdout and "记录1" in result.stdout
+        assert "Showing" not in result.stdout
+
+    def test_page_hint_absent_when_all_shown(self, mex_home):
+        """不足一页时不打印翻页提示。"""
+        self._seed_many(mex_home, 3)
+        result = _invoke("list")
+        assert "Showing" not in result.stdout
+        assert "记录1" in result.stdout and "记录3" in result.stdout
+
+    def test_json_defaults_to_all(self, mex_home):
+        """--json 默认输出全部条目（程序消费不截断），按 created_at 倒序。"""
+        self._seed_many(mex_home, 12)
+        data = json.loads(_invoke("list", "--json").stdout)
+        assert len(data) == 12
+        assert data[0]["content"] == "记录12"
+
+    def test_json_with_limit(self, mex_home):
+        """--json 显式 --limit/--offset 仍生效。"""
+        self._seed_many(mex_home, 5)
+        data = json.loads(_invoke("list", "--json", "--limit", "2").stdout)
+        assert [d["content"] for d in data] == ["记录5", "记录4"]
+
+    def test_negative_limit_error(self, mex_home):
+        _init()
+        result = _invoke("list", "--limit", "-1")
+        assert result.exit_code == 1
+        assert "--limit must be >= 0" in result.stderr
+
+    def test_negative_offset_error(self, mex_home):
+        _init()
+        result = _invoke("list", "--offset", "-1")
+        assert result.exit_code == 1
+        assert "--offset must be >= 0" in result.stderr
+
+    def test_all_with_limit_conflict(self, mex_home):
+        _init()
+        result = _invoke("list", "--all", "--limit", "5")
+        assert result.exit_code == 1
+        assert "mutually exclusive" in result.stderr
 
 
 class TestNotInitialized:

@@ -36,3 +36,6 @@ mex-dsh-plugin/
 
 # 内部改造计划文档（含个人决策信息，不入库）
 docs/opensource-refactor.md
+
+# 会话记忆目录（WorkBuddy 项目记忆，含个人决策信息，不入库）
+.workbuddy/

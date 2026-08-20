@@ -348,35 +348,90 @@ def restore_cmd(
     _emit_memory_result(f"Restored {restored.id}: {restored.content}", restored, json_out)
 
 
-@app.command("list", help="List memories (excludes deleted by default)")
+@app.command("list", help="List memories (newest first, 10 by default; --all for everything)")
 @run
-def list_cmd(
+def list_cmd(  # noqa: PLR0913, PLR0917 - Typer 命令参数即 CLI 契约，不可合并
     topic: Annotated[str | None, typer.Option("--topic", help="Filter by topic")] = None,
     sub_topic: Annotated[str | None, typer.Option("--sub-topic", help="Filter by sub-topic (requires --topic)")] = None,
     include_forgotten: Annotated[bool, typer.Option("--include-forgotten", help="Include deleted entries")] = False,
+    limit: Annotated[
+        int | None,
+        typer.Option(
+            "--limit",
+            help="Max entries per page (default 10; 0 or --all for everything)",
+        ),
+    ] = None,
+    offset: Annotated[int, typer.Option("--offset", help="Skip first N entries (pagination)")] = 0,
+    all_: Annotated[bool, typer.Option("--all", help="Print all entries (ignore default 10 limit)")] = False,
     json_out: Annotated[bool, typer.Option("--json", help="JSON output")] = False,
 ) -> None:
-    """列出记忆（默认不含已删除条目）。"""
+    """列出记忆（默认不含已删除条目）。
+
+    文本输出默认只显示最近 10 条；``--limit N`` 调整每页条数、``--offset N`` 翻页
+    （第 2 页 = ``--offset 10``）、``--limit 0`` 或 ``--all`` 打印全部。
+    ``--json`` 模式默认输出全部条目（程序消费不截断），显式 ``--limit/--offset`` 仍生效。
+    """
     if sub_topic is not None and topic is None:
         raise UserError(
             "--sub-topic requires --topic "
             "(a sub-topic belongs to a topic, e.g. --topic work --sub-topic award)",
         )
+    if limit is not None and limit < 0:
+        raise UserError("--limit must be >= 0 (0 means no limit)")
+    if offset < 0:
+        raise UserError("--offset must be >= 0")
+    if all_ and limit is not None:
+        raise UserError("--all and --limit are mutually exclusive; use one of them")
+    # 文本模式默认 10 条；--json 默认全部（向后兼容，避免程序消费丢数据）
+    if all_ or limit == 0 or (json_out and limit is None):
+        eff_limit: int | None = None
+    else:
+        eff_limit = limit if limit is not None else 10
     cfg = _load_ready_config()
     conn = connect(cfg.db_path)
     try:
-        items = memories.list_all(conn, topic=topic, sub_topic=sub_topic, include_forgotten=include_forgotten)
+        items = memories.list_all(
+            conn,
+            topic=topic,
+            sub_topic=sub_topic,
+            include_forgotten=include_forgotten,
+            limit=eff_limit,
+            offset=offset,
+        )
+        total = None if eff_limit is None else memories.count_all(
+            conn, topic=topic, sub_topic=sub_topic, include_forgotten=include_forgotten,
+        )
     finally:
         conn.close()
     if json_out:
         print_json([m.to_dict() for m in items])
         return
     schema = _load_schema_or_raise(cfg.schema_path)
-    table = render_memory_entries(items, schema)
+    table = render_memory_entries(items, schema, start=offset + 1)
     if table:
         typer.echo(table)
+        if total is not None:
+            _echo_page_hint(total, offset, len(items))
         return
     typer.echo(_empty_list_hint(topic, sub_topic))
+
+
+def _echo_page_hint(total: int, offset: int, shown: int) -> None:
+    """文本模式分页提示：还有更多条目时告知当前范围与翻页命令。
+
+    Args:
+        total: 过滤条件下的条目总数。
+        offset: 当前页起始偏移（0-based）。
+        shown: 当前页实际显示的条数。
+    """
+    shown_until = offset + shown
+    if shown_until >= total:
+        return
+    typer.echo("")
+    typer.echo(
+        f"Showing {offset + 1}-{shown_until} of {total}. "
+        f"Run `mex list --offset {shown_until}` to see the next page.",
+    )
 
 
 def _empty_list_hint(topic: str | None, sub_topic: str | None = None) -> str:

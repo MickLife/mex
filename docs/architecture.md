@@ -553,7 +553,7 @@ src/mex/
 | `mex forget <id>` 或条件批量 | 删除（默认软删除，ADR-8） | `--reason "..."` `--hard` `--dry-run` `--yes` |
 | `mex restore <id>` | 恢复已删除 | |
 | `mex gc` | 软删已到期（TTL）记录 | `--dry-run`（ADR-11：惰性过滤已令其不可见，gc 仅清理） |
-| `mex list` | 列出记忆 | `--topic --sub-topic --include-forgotten` |
+| `mex list` | 列出记忆（文本输出默认最近 10 条） | `--topic --sub-topic --include-forgotten [--limit N] [--offset N] [--all]`（`--limit` 每页条数、`--offset` 跳过前 N 条翻页，末页提示剩余条数；`--limit 0` 或 `--all` 打印全部；`--json` 模式默认输出全部、显式 `--limit/--offset` 仍生效） |
 | `mex search` | 多条件检索（手动注入） | `--topic --sub-topic --keyword --since --until --limit`（画像槽位与画像外记录统一检索） |
 | `mex profile` | 输出画像快照，供 agent 注入 | `--max-tokens --topics` |
 | `mex extract "<文本>"` / `mex extract --file <file>` | 从对话文本抽取记忆（调 LLM） | `--from plain\|claude\|opencode`（会话文件解析，见 §8.2） |

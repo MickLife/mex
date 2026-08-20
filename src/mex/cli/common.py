@@ -49,7 +49,7 @@ def print_json(obj: object) -> None:
     typer.echo(json.dumps(obj, ensure_ascii=False, indent=2))
 
 
-def render_memory_entries(memories: list[Memory], schema: Schema | None = None) -> str:
+def render_memory_entries(memories: list[Memory], schema: Schema | None = None, start: int = 1) -> str:
     """记忆列表的块状条目格式（每条两行，内容完整不截断）。
 
     第一行元信息：序号、完整 id、``topic.sub_topic``、置信度标注、最后更新时间（本地）；
@@ -62,12 +62,13 @@ def render_memory_entries(memories: list[Memory], schema: Schema | None = None) 
     Args:
         memories: 记忆列表。
         schema: 可选；用于把结构化字段的 JSON content 渲染为可读文本。
+        start: 起始序号（分页时传 offset + 1，保证跨页编号连续）。
 
     Returns:
         格式化文本（多行），由调用方输出；空列表返回空字符串。
     """
     lines: list[str] = []
-    for i, m in enumerate(memories, start=1):
+    for i, m in enumerate(memories, start=start):
         slot = _slot_text(m)
         confidence = _render_confidence(m)
         if m.is_forgotten():
