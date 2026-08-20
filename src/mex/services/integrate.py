@@ -5,7 +5,7 @@
 claude / opencode 产出 skill 说明书（写入官方 skills/mex/SKILL.md 发现路径）+ README.md
 （写入 agent 配置目录）。不再生成 hooks.md——OpenCode 原生不支持 SessionEnd hook
 （官方配置 schema 无 hooks 字段），写路径由 skill 引导 agent 即时写承担，hook 能力留待扩展；
-dsh 产出标准 DSH bundle 目录（index.js + package.json + cordis.patch.yml + README.md）。
+dsh 产出标准 DSH bundle 目录（index.js + panel.js + client.js + package.json + cordis.patch.yml + README.md）。
 """
 
 from __future__ import annotations
@@ -33,7 +33,9 @@ SKILL_FILE_LAYOUT = (
 )
 
 # DSH bundle 的组成文件（独立于 SKILL_FILE_LAYOUT 的清单）。
-DSH_BUNDLE_FILES = ("index.js", "package.json", "cordis.patch.yml", "README.md")
+# index.js = Host half（工具注册）；panel.js = Host 面板逻辑（抽取 agent 触发）；
+# client.js = Client half（浏览器 UI 面板）；package.json 声明 dsh.client 入口。
+DSH_BUNDLE_FILES = ("index.js", "panel.js", "client.js", "package.json", "cordis.patch.yml", "README.md")
 
 
 @dataclass(frozen=True)
@@ -108,7 +110,7 @@ def _generate_skill_files(agent: AgentName, base_dir: Path) -> list[str]:
 
 
 def _generate_dsh_bundle(base_dir: Path) -> list[str]:
-    """复制 DSH bundle 目录（index.js 等四件套）到 base_dir。"""
+    """复制 DSH bundle 目录（index.js/panel.js/client.js 等六件套）到 base_dir。"""
     written: list[str] = []
     for name in DSH_BUNDLE_FILES:
         source = resources.files("mex.integration").joinpath("dsh", name)

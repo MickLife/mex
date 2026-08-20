@@ -98,9 +98,9 @@ class TestIntegrate:
 
 
 class TestIntegrateDsh:
-    """dsh 产出标准 DSH bundle 目录（四件套），形态与 claude/opencode 的三件 .md 不同。"""
+    """dsh 产出标准 DSH bundle 目录（六件套：Host/Client 双 half），形态与 claude/opencode 的三件 .md 不同。"""
 
-    DSH_FILES = ("index.js", "package.json", "cordis.patch.yml", "README.md")
+    DSH_FILES = ("index.js", "panel.js", "client.js", "package.json", "cordis.patch.yml", "README.md")
 
     @pytest.fixture
     def mex_home(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
@@ -121,7 +121,7 @@ class TestIntegrateDsh:
         result = integrate("dsh", scope)
 
         assert result.agent == "dsh" and result.scope == scope
-        assert len(result.written_files) == 4
+        assert len(result.written_files) == 6
         for name in self.DSH_FILES:
             assert (expected / name).exists()
             assert str(expected / name) in result.written_files
@@ -134,11 +134,24 @@ class TestIntegrateDsh:
         pkg = (tmp_path / "mex-dsh-plugin" / "package.json").read_text(encoding="utf-8")
         assert "mex-dsh-plugin" in pkg
         assert '"type": "module"' in pkg
+        assert '"client"' in pkg  # Client half 入口
 
         js = (tmp_path / "mex-dsh-plugin" / "index.js").read_text(encoding="utf-8")
         assert "@deepseek-ai/dsh-tools" in js
         assert "export function apply" in js
         assert "defineTool" in js
+        assert "applyMexPanel" in js  # Host 面板逻辑已接入
+
+        client = (tmp_path / "mex-dsh-plugin" / "client.js").read_text(encoding="utf-8")
+        assert "__ModuleLoader__.load" in client  # Client half 打包格式
+        assert "shell.overlay" in client  # 注册到浮动层
+        assert "Add to MeX" in client  # 抽取按钮
+
+        panel = (tmp_path / "mex-dsh-plugin" / "panel.js").read_text(encoding="utf-8")
+        assert "agent/turn-stopping" in panel  # 每轮结束感知
+        assert "/mex/panel-state" in panel
+        assert "/mex/extract" in panel
+        assert "subagents.start" in panel  # 触发新 agent 对话
 
     def test_idempotent(self, mex_home, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)

@@ -13,6 +13,7 @@
  */
 
 import { defineTool } from '@deepseek-ai/dsh-tools'
+import { applyMexPanel } from './panel.js'
 
 export const name = 'mex-dsh-plugin'
 
@@ -306,4 +307,8 @@ export function apply(ctx) {
   for (const spec of toolsSpecs) {
     tools.register(makeTool({ ...spec, subprocess }))
   }
+
+  // 面板逻辑：注册 /mex/panel-state 与 /mex/extract 接口，
+  // 供 Client half 的右下角面板轮询状态与触发抽取 agent 对话。
+  return applyMexPanel(ctx)
 }
