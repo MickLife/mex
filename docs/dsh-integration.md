@@ -50,6 +50,25 @@
 
 ## 4. 触发链路逐步说明
 
+### 4.0 主题适配（深色 / 浅色 / 跟随系统）
+
+面板颜色**不使用硬编码色值**，全部引用 dsh 的主题 token（CSS 变量）：
+
+| 用途 | token |
+|---|---|
+| 卡片背景 | `var(--dsw-alias-bg-overlay)` |
+| 主文字 | `var(--dsw-alias-label-primary)` |
+| 次要/禁用文字 | `var(--dsw-alias-label-secondary)` |
+| 边框 | `var(--dsw-alias-border-l1)` |
+| 运行中徽标/提示（黄） | `var(--dsw-alias-state-warn-primary)` |
+| 可抽取徽标/提示/按钮（绿） | `var(--dsw-alias-state-success-primary)` |
+| 禁用按钮背景 | `var(--dsw-alias-bg-layer-1)` |
+| 阴影 | `var(--dsw-shadow-lv3, 0 8px 24px rgba(0,0,0,0.28))`（fallback） |
+
+dsh 的主题系统（ui-theme）在 `body[data-ds-dark-theme]` 上按当前偏好（深色 / 浅色 /
+跟随系统）解析这些变量的值，面板位于 shell.overlay（body 内），因此颜色**自动跟随
+三种主题**，无需插件感知主题偏好或监听主题切换事件。
+
 ### 4.1 点击按钮 → 浏览器发请求（client.js）
 
 `onAddToMex` 只把**当前会话 id** 发给 Host，对话内容本身不随请求传输：

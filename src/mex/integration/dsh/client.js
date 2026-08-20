@@ -124,7 +124,8 @@ window.__ModuleLoader__.load({
       var hasNew = panel !== null && panel.ok === true && panel.hasNew === true
       var canRun = sessionId !== undefined && !busy && !running && !agentRunning
 
-      // 面板卡片：固定右下角，深色底，紧凑布局。
+      // 面板卡片：固定右下角，使用 dsh 主题 token（CSS 变量），
+      // 自动跟随深色/浅色/跟随系统三种主题。
       var cardStyle = {
         position: 'fixed',
         right: '16px',
@@ -136,11 +137,12 @@ window.__ModuleLoader__.load({
         width: '240px',
         padding: '12px',
         borderRadius: '12px',
-        background: 'rgba(24, 24, 27, 0.92)',
-        color: '#e4e4e7',
+        background: 'var(--dsw-alias-bg-overlay)',
+        color: 'var(--dsw-alias-label-primary)',
         fontFamily: 'system-ui, sans-serif',
         fontSize: '13px',
-        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.28)',
+        boxShadow: 'var(--dsw-shadow-lv3, 0 8px 24px rgba(0, 0, 0, 0.28))',
+        border: '1px solid var(--dsw-alias-border-l1)',
         pointerEvents: 'auto',
       }
 
@@ -156,11 +158,19 @@ window.__ModuleLoader__.load({
         width: '8px',
         height: '8px',
         borderRadius: '50%',
-        background: running ? '#facc15' : hasNew ? '#4ade80' : '#52525b',
+        background: running
+          ? 'var(--dsw-alias-state-warn-primary)'
+          : hasNew
+            ? 'var(--dsw-alias-state-success-primary)'
+            : 'var(--dsw-alias-label-secondary)',
       }
 
       var hintStyle = {
-        color: running ? '#fde68a' : hasNew ? '#bbf7d0' : '#a1a1aa',
+        color: running
+          ? 'var(--dsw-alias-state-warn-primary)'
+          : hasNew
+            ? 'var(--dsw-alias-state-success-primary)'
+            : 'var(--dsw-alias-label-secondary)',
         lineHeight: '18px',
       }
 
@@ -169,8 +179,12 @@ window.__ModuleLoader__.load({
         padding: '8px 10px',
         border: 'none',
         borderRadius: '8px',
-        background: hasNew && !running ? '#16a34a' : '#3f3f46',
-        color: hasNew && !running ? '#ffffff' : '#a1a1aa',
+        background: hasNew && !running
+          ? 'var(--dsw-alias-state-success-primary)'
+          : 'var(--dsw-alias-bg-layer-1)',
+        color: hasNew && !running
+          ? 'var(--dsw-alias-bg-base)'
+          : 'var(--dsw-alias-label-secondary)',
         cursor: canRun ? 'pointer' : 'not-allowed',
         fontWeight: 600,
         fontSize: '13px',
@@ -179,10 +193,10 @@ window.__ModuleLoader__.load({
       var viewStyle = {
         width: '100%',
         padding: '6px 10px',
-        border: '1px solid #3f3f46',
+        border: '1px solid var(--dsw-alias-border-l1)',
         borderRadius: '8px',
         background: 'transparent',
-        color: '#e4e4e7',
+        color: 'var(--dsw-alias-label-primary)',
         cursor: 'pointer',
         fontWeight: 500,
         fontSize: '12px',

@@ -77,7 +77,8 @@ dsh web
 注册 `/mex/panel-state`（状态轮询）与 `/mex/extract`（触发抽取）两个 HTTP 接口，
 并监听 `subagent/end` 标记抽取完成；Client half（`client.js`）注册到
 `shell.overlay` 浮动层并调用这两个接口，通过 `sessions.openSubagent` 打开
-子代理会话视图。
+子代理会话视图。面板颜色全部使用 dsh 主题 token（`--dsw-alias-*`），自动
+跟随深色 / 浅色 / 跟随系统三种主题。
 
 > **注意**：抽取依赖 spawn 子代理（`dsh-subagent-spawn-in-process`，dsh 默认
 > 装配），且每次抽取以"最近一轮对话"为单位——多轮未点只抽取最近一轮，点一次抽一轮。
