@@ -37,6 +37,18 @@ window.__ModuleLoader__.load({
       var useSessions = props.useSessions
       var sessionId = useSessions(function (s) { return s.current })
 
+      /** 解析 JSON 响应；非 JSON（405 空 body / HTML fallback）转为结构化错误提示。 */
+      var parseJson = function (res) {
+        return res.text().then(function (text) {
+          if (!text) return { ok: false, error: '接口返回空响应（Host 服务可能未就绪，请重启 dsh 后重试）' }
+          try {
+            return JSON.parse(text)
+          } catch (err) {
+            return { ok: false, error: '接口返回非 JSON 响应（' + String(err) + '），请重启 dsh 后重试' }
+          }
+        })
+      }
+
       var state = React.useState(null)
       var panel = state[0]
       var setPanel = state[1]
@@ -56,7 +68,7 @@ window.__ModuleLoader__.load({
         var tick = function () {
           if (!sessionId) return
           fetch('/mex/panel-state?sessionId=' + encodeURIComponent(sessionId))
-            .then(function (res) { return res.json() })
+            .then(parseJson)
             .then(function (data) {
               if (alive) setPanel(parseState(data))
             })
@@ -80,7 +92,7 @@ window.__ModuleLoader__.load({
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ sessionId: sessionId }),
         })
-          .then(function (res) { return res.json() })
+          .then(parseJson)
           .then(function (data) { setResult(data) })
           .catch(function (err) {
             setResult({ ok: false, error: String(err) })

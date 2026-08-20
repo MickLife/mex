@@ -129,18 +129,18 @@ function queryOf(req) {
 
 /**
  * 注册面板接口与抽取逻辑。
+ *
+ * 注意：不能用 `ctx.get('webServer')` 一次性获取——bundle 插件的 apply 时机
+ * 可能早于 webServer 服务注册（装配时序由 Cordis 依赖决定），拿到 undefined
+ * 会导致路由永不注册、面板请求落到 SPA fallback。正确做法是用
+ * `ctx.inject(['webServer'], ...)` 等待服务可用后再注册路由；headless 环境
+ * 服务永不出现则回调不执行，插件其余功能（mex 工具）不受影响。
+ *
  * @param ctx - bundle 插件上下文。
- * @returns 移除所有注册的 disposer（bundle 卸载时清理）。
  */
 export function applyMexPanel(ctx) {
-  const webServer = ctx.get('webServer')
-  const agents = ctx.get('agents')
-  const subagents = ctx.get('subagents')
-
-  // 依赖缺失时静默降级（headless / 非 web 环境）。
-  if (webServer === undefined) return () => {}
-
   // 每轮对话即将关闭时缓存该轮对话文本，供面板提示与抽取使用。
+  // 该监听不依赖 webServer，始终注册。
   ctx.on('agent/turn-stopping', ({ agent, turn }) => {
     try {
       // session.log 是实时追加数组；session.events 是惰性冻结快照，
@@ -169,6 +169,8 @@ export function applyMexPanel(ctx) {
   const onExtract = async (req, res) => {
     const body = await readJsonBody(req)
     const sessionId = body && typeof body.sessionId === 'string' ? body.sessionId : undefined
+    const agents = ctx.get('agents')
+    const subagents = ctx.get('subagents')
     if (!sessionId || agents === undefined || subagents === undefined) {
       sendJson(res, 200, { ok: false, error: '依赖服务不可用（agents/subagents 未装配）' })
       return
@@ -208,10 +210,15 @@ export function applyMexPanel(ctx) {
     }
   }
 
-  const d1 = webServer.register({ kind: 'exact', path: '/mex/panel-state', handler: onPanelState })
-  const d2 = webServer.register({ kind: 'exact', path: '/mex/extract', handler: onExtract })
-  return () => {
-    d1()
-    d2()
-  }
+  // 等待 webServer 服务可用后再注册路由（web 环境）；回调返回 disposer，
+  // 服务卸载时由 Cordis 收集清理。
+  ctx.inject(['webServer'], (webCtx) => {
+    const webServer = webCtx.webServer
+    const d1 = webServer.register({ kind: 'exact', path: '/mex/panel-state', handler: onPanelState })
+    const d2 = webServer.register({ kind: 'exact', path: '/mex/extract', handler: onExtract })
+    return () => {
+      d1()
+      d2()
+    }
+  })
 }
