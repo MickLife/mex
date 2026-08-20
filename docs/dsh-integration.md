@@ -60,7 +60,7 @@
 
   | 用途 | token |
   |---|---|
-  | 卡片背景 | `var(--dsw-alias-bg-overlay)` |
+  | 卡片背景 | `var(--dsw-specific-menu)`（= `bg-layer-3` = `neutral-bluish-800`，`rgb(53,54,56)`，比 `bg-overlay` 更深，与官方弹层/菜单一致） |
   | 主文字 | `var(--dsw-alias-label-primary)` |
   | 次要/禁用文字 | `var(--dsw-alias-label-secondary)` |
   | 边框 | `var(--dsw-alias-border-l1)` |

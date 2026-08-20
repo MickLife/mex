@@ -204,7 +204,10 @@ window.__ModuleLoader__.load({
 
       // 配色：深色主题用 dsh token（自动跟随）；浅色主题微调——
       // 背景用非常浅的灰，成功绿加深保证可读性。
-      var cardBg = isDark ? 'var(--dsw-alias-bg-overlay)' : '#f5f6f8'
+      // 深色主题背景用 --dsw-specific-menu（= bg-layer-3 = neutral-bluish-800，
+      // rgb(53,54,56)，比 bg-overlay 更深，与官方弹层/菜单一致）；
+      // 浅色主题用非常浅的灰。
+      var cardBg = isDark ? 'var(--dsw-specific-menu)' : '#f5f6f8'
       var labelMain = isDark ? 'var(--dsw-alias-label-primary)' : '#1f2328'
       var labelSecondary = isDark ? 'var(--dsw-alias-label-secondary)' : '#6b7280'
       var borderColor = isDark ? 'var(--dsw-alias-border-l1)' : '#e3e6ea'
