@@ -40,7 +40,14 @@ def expected_dir(tmp_path: Path, agent: str, scope: str) -> Path:
 
 
 class TestIntegrateCli:
-    @pytest.mark.parametrize("agent", ["claude", "opencode"])
+    # 各 agent 的 skill 相对路径（claude/opencode 走 skills/ 子目录，workbuddy 的 base 即 skill 根）。
+    SKILL_REL = {
+        "claude": "skills/mex/SKILL.md",
+        "opencode": "skills/mex/SKILL.md",
+        "workbuddy": "mex/SKILL.md",
+    }
+
+    @pytest.mark.parametrize("agent", ["claude", "opencode", "workbuddy"])
     @pytest.mark.parametrize("scope", ["project", "global"])
     def test_success_outputs_paths(self, mex_home, tmp_path, monkeypatch, agent, scope):
         if scope == "global":
@@ -54,7 +61,7 @@ class TestIntegrateCli:
         assert "SKILL.md" in result.stdout and "README.md" in result.stdout
         assert "Next steps" in result.stdout
         target = expected_dir(tmp_path, agent, scope)
-        for rel in ("skills/mex/SKILL.md", "README.md"):
+        for rel in (self.SKILL_REL[agent], "README.md"):
             assert (target / rel).exists()
             assert str(target / rel) in result.stdout
 
@@ -65,6 +72,16 @@ class TestIntegrateCli:
 
         assert result.exit_code == 0, result.stderr
         assert (tmp_path / ".claude" / "skills" / "mex" / "SKILL.md").exists()
+
+    def test_workbuddy_global_target_dir(self, mex_home, tmp_path, monkeypatch):
+        """workbuddy 的 global 目标目录是 ~/.workbuddy/skills（本身就是 skill 根）。"""
+        fake_home(tmp_path, monkeypatch)
+
+        result = runner.invoke(app, ["integrate", "workbuddy"])
+
+        assert result.exit_code == 0, result.stderr
+        assert (tmp_path / ".workbuddy" / "skills" / "mex" / "SKILL.md").exists()
+        assert not (tmp_path / ".workbuddy" / "skills" / "skills" / "mex").exists()
 
     def test_unknown_agent_exit_1(self, mex_home, tmp_path, monkeypatch):
         fake_home(tmp_path, monkeypatch)

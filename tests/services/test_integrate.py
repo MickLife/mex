@@ -13,7 +13,7 @@ import pytest
 from mex.cli.common import UserError
 from mex.services.integrate import AGENT_TARGETS, integrate
 
-AGENTS = ("claude", "opencode")
+AGENTS = ("claude", "opencode", "workbuddy")
 SCOPES = ("project", "global")
 
 
@@ -38,8 +38,13 @@ def target_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, agent: str, scop
 
 
 class TestIntegrate:
-    # claude/opencode 生成物：skill 说明书（官方 skills/mex/SKILL.md 发现路径）+ README。
-    GENERATED_FILES = ("skills/mex/SKILL.md", "README.md")
+    # 各 agent 生成物：skill 说明书（claude/opencode 走官方 skills/mex/SKILL.md 发现路径，
+    # workbuddy 的 base 本身就是 skill 根目录 → mex/SKILL.md）+ README。
+    GENERATED_FILES = {
+        "claude": ("skills/mex/SKILL.md", "README.md"),
+        "opencode": ("skills/mex/SKILL.md", "README.md"),
+        "workbuddy": ("mex/SKILL.md", "README.md"),
+    }
 
     @pytest.mark.parametrize("agent", AGENTS)
     @pytest.mark.parametrize("scope", SCOPES)
@@ -50,7 +55,7 @@ class TestIntegrate:
 
         assert result.agent == agent and result.scope == scope
         assert len(result.written_files) == 2
-        for rel in self.GENERATED_FILES:
+        for rel in self.GENERATED_FILES[agent]:
             assert (expected / rel).exists()
             assert str(expected / rel) in result.written_files
 
@@ -61,7 +66,7 @@ class TestIntegrate:
 
         integrate(agent, scope)
 
-        for rel in self.GENERATED_FILES:
+        for rel in self.GENERATED_FILES[agent]:
             content = (expected / rel).read_text(encoding="utf-8")
             assert "{{" not in content, f"{rel} 仍含未替换占位符"
             assert str(mex_home) in content
@@ -75,9 +80,10 @@ class TestIntegrate:
         second = integrate(agent, "project")
 
         assert first.written_files == second.written_files
-        for rel in self.GENERATED_FILES:
+        for rel in self.GENERATED_FILES[agent]:
             assert (expected / rel).exists()
-        assert "{{" not in (expected / "skills" / "mex" / "SKILL.md").read_text(encoding="utf-8")
+        skill_rel = self.GENERATED_FILES[agent][0]
+        assert "{{" not in (expected / skill_rel).read_text(encoding="utf-8")
 
     def test_not_initialized_raises(self, tmp_path, monkeypatch):
         monkeypatch.setenv("MEX_HOME", str(tmp_path))

@@ -1,0 +1,46 @@
+# meX × WorkBuddy：对接步骤
+
+> 由 `mex integrate workbuddy` 生成，生成目录：`{{AGENT_DIR}}`
+
+本目录包含 meX 与 WorkBuddy 对接所需的文件：
+
+| 文件 | 用途 |
+|---|---|
+| `mex/SKILL.md` | skill 说明书（教 WorkBuddy 何时读取 / 写入记忆） |
+| `README.md` | 本文件（对接步骤） |
+
+> 说明：本集成以 skill 承载读写引导（与 OpenCode / Claude Code 集成一致），
+> 不依赖会话结束 hook（WorkBuddy / OpenCode 均无官方 SessionEnd hook），
+> hook 能力留待后续扩展。
+
+## 前置条件
+
+1. meX 已初始化：`mex init`（数据目录 `{{MEX_HOME}}`）。
+2. `mex` 命令在 PATH 中（项目 `pip install -e .` 或 `uv sync` 安装后生效）。
+
+## 对接步骤
+
+### 1. 安装 skill（教 WorkBuddy 用记忆）
+
+skill 已生成到本目录 `mex/SKILL.md`，WorkBuddy 会从以下位置自动发现 skill：
+
+- 全局（推荐，所有项目生效）：`{{AGENT_DIR}}/mex/SKILL.md`（即 ~/.workbuddy/skills/mex/SKILL.md）
+- 项目级（仅当前项目）：`./.workbuddy/skills/mex/SKILL.md`
+
+如果生成目录与上述位置一致，直接新开一个 WorkBuddy 会话即可生效；
+若不一致，把 `mex/` 目录复制到对应位置。
+
+> 注意：项目级生成到 `./.workbuddy/skills/`，该目录通常被项目 `.gitignore`
+> 忽略（属于用户本地配置，不含项目源码）。
+
+### 2. 验证
+
+1. 新开一个 WorkBuddy 会话（让新 skill 生效）。
+2. 让 WorkBuddy 执行 `mex profile`，确认能输出用户画像。
+3. 对 WorkBuddy 说"记住这个：我喜欢喝美式咖啡"，确认它执行 `mex extract "我喜欢喝美式咖啡"`。
+4. 运行 `mex list` 能看到新记忆。
+
+## 数据与回滚
+
+- 数据目录：`{{MEX_HOME}}`（数据库 `{{DB_PATH}}`，可用 `mex export` 备份）。
+- 想取消集成：删掉 skill 目录（`mex/`）即可，不影响既有记忆。
