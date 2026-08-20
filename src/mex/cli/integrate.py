@@ -1,7 +1,7 @@
 """``mex integrate`` 命令：生成 agent 的 skill 说明书与 README（M8）。
 
 用法：
-    mex integrate claude|opencode|dsh [--scope project|global] [--json]
+    mex integrate claude|opencode|workbuddy|dsh [--scope project|global] [--json]
 """
 
 from __future__ import annotations
@@ -14,14 +14,14 @@ from mex.cli import app, run
 from mex.cli.common import UserError, print_json
 from mex.services.integrate import AGENT_TARGETS, AgentName, Scope, IntegrationResult, integrate
 
-_SUPPORTED_AGENTS = "claude, opencode, dsh"
+_SUPPORTED_AGENTS = "claude, opencode, workbuddy, dsh"
 _SCOPES = ("project", "global")
 
 
 @app.command("integrate", help="Generate agent integration files (skill guide + README)")
 @run
 def integrate_cmd(
-    agent: str = typer.Argument(..., help="Target agent: claude / opencode / dsh"),
+    agent: str = typer.Argument(..., help="Target agent: claude / opencode / workbuddy / dsh"),
     scope: str = typer.Option("global", "--scope", help="project (current dir) / global (user dir, default)"),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ) -> None:
@@ -58,6 +58,12 @@ def _next_steps(agent: AgentName) -> str:
         return (
             f"Next steps: the skill is ready at {skill}. "
             "Start a new session for it to take effect, then ask the agent to run `mex profile` to verify."
+        )
+    if agent == "workbuddy":
+        skill = "~/.workbuddy/skills/mex/SKILL.md (global), ./.workbuddy/skills/mex/SKILL.md (project)"
+        return (
+            f"Next steps: the skill is ready at {skill}. "
+            "Start a new WorkBuddy session for it to take effect, then ask the agent to run `mex profile` to verify."
         )
     # dsh
     return (

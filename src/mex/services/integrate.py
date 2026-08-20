@@ -2,9 +2,9 @@
 
 仅生成文件、不执行任何外部命令；幂等（重复执行覆盖旧文件，不报错）。
 
-claude / opencode 产出 skill 说明书（写入官方 skills/mex/SKILL.md 发现路径）+ README.md
-（写入 agent 配置目录）。不再生成 hooks.md——OpenCode 原生不支持 SessionEnd hook
-（官方配置 schema 无 hooks 字段），写路径由 skill 引导 agent 即时写承担，hook 能力留待扩展；
+claude / opencode / workbuddy 产出 skill 说明书 + README.md（写入 agent 的 skill 发现目录）。
+不再生成 hooks.md——OpenCode 原生不支持 SessionEnd hook（官方配置 schema 无 hooks 字段），
+写路径由 skill 引导 agent 即时写承担，hook 能力留待扩展；
 dsh 产出标准 DSH bundle 目录（index.js + panel.js + client.js + package.json + cordis.patch.yml + README.md）。
 """
 
@@ -21,16 +21,19 @@ from loguru import logger
 from mex.cli.common import UserError
 from mex.config import get_mex_home
 
-AgentName = Literal["claude", "opencode", "dsh"]
+AgentName = Literal["claude", "opencode", "workbuddy", "dsh"]
 Scope = Literal["project", "global"]
 
-# claude/opencode 的生成物布局：(模板文件名, 目标相对路径)。
-# skill 说明书写入官方 skills/<name>/SKILL.md（skills 为复数，Claude Code / OpenCode 的
-# 官方发现路径），README 写配置目录根。hooks.md 不再生成（见模块 docstring）。
-SKILL_FILE_LAYOUT = (
-    ("skill.md", "skills/mex/SKILL.md"),
-    ("README.md", "README.md"),
-)
+# 各 agent 的生成物布局：(模板文件名, 目标相对路径)。
+# claude/opencode 的 base 是配置根目录，skill 写入官方 skills/<name>/SKILL.md（skills 为复数，
+# Claude Code / OpenCode 的官方发现路径）；workbuddy 的 base 本身就是 skill 根目录
+# （~/.workbuddy/skills / ./.workbuddy/skills），skill 直接写入 mex/SKILL.md。
+# README 一律写 base 根目录。hooks.md 不再生成（见模块 docstring）。
+SKILL_FILE_LAYOUT: dict[AgentName, tuple[tuple[str, str], ...]] = {
+    "claude": (("skill.md", "skills/mex/SKILL.md"), ("README.md", "README.md")),
+    "opencode": (("skill.md", "skills/mex/SKILL.md"), ("README.md", "README.md")),
+    "workbuddy": (("skill.md", "mex/SKILL.md"), ("README.md", "README.md")),
+}
 
 # DSH bundle 的组成文件（独立于 SKILL_FILE_LAYOUT 的清单）。
 # index.js = Host half（工具注册）；panel.js = Host 面板逻辑（抽取 agent 触发）；
@@ -47,11 +50,12 @@ class IntegrationResult:
     written_files: list[str]
 
 
-# 目标根目录（claude/opencode）：global 用 ~ 前缀（Path.home() 展开）；project 为相对当前目录。
+# 目标根目录（claude/opencode/workbuddy）：global 用 ~ 前缀（Path.home() 展开）；project 为相对当前目录。
 # dsh 的目标目录单独处理（见 _resolve_base_dir 分支），不在此表内。
 AGENT_TARGETS: dict[AgentName, dict[Scope, str]] = {
     "claude": {"global": "~/.claude", "project": ".claude"},
     "opencode": {"global": "~/.config/opencode", "project": ".opencode"},
+    "workbuddy": {"global": "~/.workbuddy/skills", "project": ".workbuddy/skills"},
 }
 
 _PLACEHOLDERS = (
@@ -65,11 +69,11 @@ _PLACEHOLDERS = (
 def integrate(agent: AgentName, scope: Scope) -> IntegrationResult:
     """生成 agent 集成文件。
 
-    claude/opencode：渲染 hook/skill/README 三件写入 agent 配置目录；
+    claude/opencode/workbuddy：渲染 skill 说明书 + README 写入 agent 的 skill 发现目录；
     dsh：复制标准 DSH bundle 目录到目标位置。
 
     Args:
-        agent: 目标 agent（claude / opencode / dsh）。
+        agent: 目标 agent（claude / opencode / workbuddy / dsh）。
         scope: 作用域（project 写当前目录，global 写用户目录）。
 
     Returns:
@@ -86,12 +90,13 @@ def integrate(agent: AgentName, scope: Scope) -> IntegrationResult:
 
 
 def _generate_skill_files(agent: AgentName, base_dir: Path) -> list[str]:
-    """渲染 claude/opencode 的 skill 说明书 + README 写入 base_dir。
+    """渲染 claude/opencode/workbuddy 的 skill 说明书 + README 写入 base_dir。
 
-    skill.md 落到 ``base_dir/skills/mex/SKILL.md``（官方发现路径），README 落根目录。
+    目标相对路径取自 ``SKILL_FILE_LAYOUT[agent]``（claude/opencode 落到
+    ``base_dir/skills/mex/SKILL.md``，workbuddy 落到 ``base_dir/mex/SKILL.md``），README 落根目录。
 
     Args:
-        agent: 目标 agent（claude / opencode）。
+        agent: 目标 agent（claude / opencode / workbuddy）。
         base_dir: agent 配置根目录。
 
     Returns:
@@ -99,7 +104,7 @@ def _generate_skill_files(agent: AgentName, base_dir: Path) -> list[str]:
     """
     mex_home = get_mex_home()
     written: list[str] = []
-    for template_name, rel_path in SKILL_FILE_LAYOUT:
+    for template_name, rel_path in SKILL_FILE_LAYOUT[agent]:
         target = base_dir / rel_path
         content = _render_template(agent, template_name, base_dir, mex_home)
         target.parent.mkdir(parents=True, exist_ok=True)
